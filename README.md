@@ -1,4 +1,4 @@
-# Wine Qualityp Prediction (regression + classification)
+# Wine Quality Prediction (regression + classification)
 ## Warning: A lot of humour contained in this project, do not take anything seriously!
 
 Welcome to my wine project! I hope you will appreciate the journey! For a long time, wine tasters have been seen as the only trustworthy source 
