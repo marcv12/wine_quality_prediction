@@ -20,11 +20,14 @@ taking customers from Vivino, increasing customer loyalty and then using their o
 and not in the scope of this project.  
   
   
+  
 **As for the sequence of this project:**
 1. Start by opening final_project_DA4B.R, or proj_1_reg.Rmd, or proj_1_reg.html (they are the same files but in different formats: I leave the choice to you!): this contains the regression problem
 2. Then open fin_proj_classification.R, or Proj_2_class.rmd, or Proj_2_class.html (again, same files but different formats!)
   
   
   
+    
+    
 I hope you enjoy this project as much as I did doing it!  
 In case there is any issue, contact me at marcviolides@yahoo.com
