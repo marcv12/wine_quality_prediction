@@ -29,9 +29,9 @@ and not in the scope of this project.
   
   
   
-Just to spoil you, I will also provide you with compiled html versions of both taks: ENJOY!
-[Regression task](https://ccyzzvc0pnsf60ehtkzvuw.on.drv.tw/proj_1_reg.html)
-[Classification task](https://ccyzzvc0pnsf60ehtkzvuw.on.drv.tw/Proj_2_class.html)
+Just to spoil you, I will also provide you with compiled html versions of both taks: ENJOY!  
+- [Regression task](https://ccyzzvc0pnsf60ehtkzvuw.on.drv.tw/proj_1_reg.html)  
+- [Classification task](https://ccyzzvc0pnsf60ehtkzvuw.on.drv.tw/Proj_2_class.html)
   
   
   
