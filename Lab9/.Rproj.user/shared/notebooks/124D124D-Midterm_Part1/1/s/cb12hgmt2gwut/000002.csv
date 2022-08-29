@@ -1,0 +1,4 @@
+"0","df_train$Closed_Account[df_train$Closed_Account == 0] <- ""no"""
+"0","df_train$Closed_Account[df_train$Closed_Account == 1] <- ""yes"""
+"0",""
+"0","df_train$Closed_Account <- as.factor(df_train$Closed_Account)"

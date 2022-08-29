@@ -1,0 +1,8 @@
+"0","ROCBicOut <- roc(validation$Closed_Account, predict(myfit3.BIC, newdata=validation, "
+"0","                                  type = ""response""), plot = TRUE,"
+"0","                 legacy.axes=TRUE, col=""midnightblue"", lwd=3,"
+"0","                 auc.polygon=T, auc.polygon.col=""lightblue"", print.auc=T)"
+"2","Setting levels: control = no, case = yes
+"
+"2","Setting direction: controls < cases
+"

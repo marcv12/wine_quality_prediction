@@ -1,0 +1,104 @@
+library(stats)
+require(tidyverse)
+require(magrittr)
+require(ISLR)
+require(glmnet)
+library(tidyverse)
+library(ISLR)
+library(boot)
+library(rlang)
+library(class)
+library(caret)
+library(boot)
+library(pROC) # to get AUC
+library(ggplot2)
+
+
+dat <- Auto %>% as_tibble()
+dat %>% glimpse
+
+dat %>% ggplot() + geom_density(aes(x=mpg)) + theme_bw()
+#looks fine, no need to apply log transformation (not too close to 0 to cause any issue)
+#also not bimodal so fine
+
+n <- nrow(dat)
+X <- model.matrix(mpg~.-1, data = dat)
+Y <- dat$mpg
+
+set.seed(13)
+ntr <- round(n*0.7)
+nte <- n-ntr
+trIdx <- sample(1:n, size=ntr)
+
+Xtr <- X[trIdx,]
+Ytr <- Y[trIdx]
+Xte <- X[-trIdx,]
+Yte <- Y[-trIdx]
+?Auto
+# Scale the numerical covariates only
+XtrNum <- Xtr[, -7]# Deselect name and origin
+XtrNum <- Xtr[, -8]
+XteNum <- Xte[, -7]
+XteNum <- Xte[, -8]
+XtrNumS <- XtrNum %>% scale()   # Standardize
+XteNumS <- XteNum %>% scale(., center=attr(XtrNumS, "scaled:center"),
+                            scale=attr(XtrNumS, "scaled:scale"))
+
+XtrS <- cbind(chas=Xtr[,7], XtrNumS)  # Re-append the dummy variables
+XtrS <- cbind(chas=Xtr[,8], XtrNumS)
+XteS <- cbind(chas=Xte[,7], XteNumS)
+XteS <- cbind(chas=Xte[,8], XteNumS)
+
+
+
+
+#Now fit lasso
+nlambdas <- 100
+lambdas <- seq(0.001, 2, length.out = nlambdas)
+
+Lasso.cv <- cv.glmnet(XtrS, Ytr, lambda=lambdas, alpha=1,
+                      family="gaussian")
+
+plot(Lasso.cv$lambda, Lasso.cv$cvm,
+     ylab="Error", xlab=expression(lambda))
+plot(log(Lasso.cv$lambda), Lasso.cv$cvm,
+     ylab="Error", xlab=expression(log(lambda)))# Plot from scratch
+plot(Lasso.cv) # Automatic plot
+
+Lasso.cv$lambda.min
+labdaStar <- Lasso.cv$lambda.1se
+
+#Here is the best lasso model
+best.lasso <- glmnet(XtrS, Ytr, lambda=labdaStar, alpha=1,
+  
+#Here are the most important features in Lasso (where it is not empty is important feature (aka non-zero))                                                      family="gaussian")
+coef(best.lasso)
+
+
+#3 elastic net and 5-fold CV for alpha=0.3
+nfolds <- 5
+nalphas <- 20
+alphas <- seq(0, 1, length.out=nalphas)
+require(caret)
+ctrl <- trainControl(method="cv", number=nfolds)
+Lasso.caret <- train(XtrS, Ytr, method = "glmnet", trControl = ctrl,
+                     tuneGrid = expand.grid(alpha = 0.3, 
+                                            lambda = lambdas))
+Lasso.caret$bestTune
+
+#Get best lambda
+best.Lambda <- Lasso.caret$bestTune$lambda
+
+boot.fn = function(data, index) return(predict(glm(mpg ~ .-1, 
+                                                data = data, subset = index)))
+
+library(boot)
+B = 1e3
+boot_probs = boot(data = Auto, statistic = boot.fn, R = B)
+
+# pred se
+prob_se = sd(boot_probs$t)
+prob_se
+# ci
+c(prob_l - 2*prob_se, prob_l + 2*prob_se)
+

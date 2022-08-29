@@ -1,0 +1,13 @@
+"0","p9 <- ggplot(df, aes(x=sulphates)) + ggtitle(""Sulphates"") + "
+"0","  xlab(""Sulphates"") + geom_histogram(fill=""salmon"")"
+"0","p10 <- ggplot(df, aes(x=alcohol )) + ggtitle(""Alcohol"")+ "
+"0","  xlab(""alcohol"") + geom_histogram(fill=""salmon"") "
+"0","p11 <- ggplot(df, aes(x=quality)) + ggtitle(""Quality"") + xlab(""quality"") + "
+"0","  geom_bar(fill=""salmon"") "
+"0","grid.arrange(p9, p10, p11, ncol=2)"
+"2","`stat_bin()` using `bins = 30`. Pick better value
+with `binwidth`.
+"
+"2","`stat_bin()` using `bins = 30`. Pick better value
+with `binwidth`.
+"

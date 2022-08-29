@@ -1,0 +1,4 @@
+"0","fitControl = trainControl("
+"0","  method = ""repeatedcv"","
+"0","  number = 10,"
+"0","  repeats = 2)"

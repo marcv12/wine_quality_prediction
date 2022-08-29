@@ -1,0 +1,761 @@
+#Welcome to my wine project! I hope you will appreciate the journey!
+#For a long time, wine tasters have been seen as the only trustworthy source 
+#for giving a reliable opinion on the quality of wine. More recently, Vivino 
+#has come into the picture: it relies on community-based ratings. 
+#My company "Weeno" (aka We Know) is a newcomer into the field of wine tasting 
+#and has to define business problems to make an effective entry into this market.
+#I have defined 2 business goals: one for the short-term and the other for the
+#long-term. 
+
+#Our short-term business problem is of customer acquisition. In order to achieve
+#this goal, a crucial part has to be how reliable we are; because let's be real,
+#nowadays community-based platforms are taking a lot of markets by storm. This is 
+#why to be able to compete with them, we must be able to convince our consumers 
+#that our results are the most accurate possible. We will use regression to 
+#answer this first business problem by predicting the quality of wine given a set
+#of inputs (nothing to crazy!). Our focus here must be on lowing the error rates
+#we make as much as possible (you will see later which error metrics I chose).
+
+#Our second task will be that of customer retention. Indeed, it is one thing to 
+#give accurate predictions, but what if we go one step further and predict whether
+#the user will like the wine or not. This is achieved through a classification 
+#problem that you can find in the other file. Through this regression problem, we
+#are going to predict whether a wine is "good" or "bad" and this will allow us to 
+#keep our customers loyal because they would think that we are giving them these 
+#predictions based on their preferences, when in reality it is all pre-programmed. 
+#However, this must remain a secret between us.
+
+#Eventually, when my business expands and my reach increases significantly I will 
+#be able to ask users for their ratings and eventually not only display the algorithm's
+#prediction but also what others think. Now you must be thinking: but isn't the 
+#community part exactly like Vivino's model, and to that I say "YES". We are
+#taking customers from Vivino, increasing customer loyalty and then using their
+#own model in an indirect way! However, this is too much of a long-term thinking 
+#and not in the scope of this project.
+
+#With the scenario being set, in this file you will find the regression problem 
+#in which I will proceed in 3 main simple steps:
+#1. Data cleaning + Data exploration
+#2. Find the best performing VANILLA model
+#3. Optimize the best model found in 2.
+
+
+
+
+
+#-------------------------Step -1: import lbraries ------------------------------
+library(caret)
+library(dplyr)
+library(GGally)
+library(ggplot2)
+library(tidyverse)
+library(corrplot)
+library(gridExtra)
+library(ggpubr)
+library(moments)
+library(rpart)
+library(rpart.plot)
+library(pROC)
+library(AUC)
+library(glmnet)
+library(C50)
+library(randomForest)
+library(boot)
+library(doParallel)
+library(leaps)
+library(gam)
+library(stats)
+
+
+#Ignore this function, I use this when caret (interference with doParallel lib)
+unregister_dopar <- function() {
+  env <- foreach:::.foreachGlobals
+  rm(list=ls(name=env), pos=env)
+}
+
+
+#----------------------Step 0: import the data--------------------------------
+df <- read.csv(file = "WineQuality.csv", 
+                     header=T,
+                     sep=",",
+                     dec=".",
+                     stringsAsFactors = T)
+
+
+#----------------Step 1: Data exploration + Data cleaning --------------------
+
+df %>% map(~ sum(is.na(.)))
+#Wonderful, no null values
+
+
+#Understanding the variables:
+#1)Residual sugar: the amount of sugar left after the fermentation stops
+#2)pH: The level of acidity
+#3)Free sulfur dioxide: prevents microbial growth and the oxidation of wine
+#4)Fixed acidity: non-volatile acids that do not evaporate immediately
+#5)Density: the sweeter the wine, the higher density
+#6)Chlorides: the amount of salt in the wine
+#7)Alcohol: we all know what it is...
+#8)Volatile acidity: leads to unpleasant vinegar taste
+#9)Sulphates: a wine additive that contributes to SO2 levels 
+#10)Total sulfur dioxide: Amount of free + bound forms of SO2
+#11)Citric acid: acts as preservative to increase acidity
+
+#Before starting our exploration phase, allow me to remove some blatant outliers. 
+#This step might be unnecessary in your eyes because we are compromising a 
+#significant number of data observations. However, these observations largely 
+#interfere with the reality of the situation and the results will not be satisfactory.
+#I have tried to do the experiment multiple times, fitting the algorithms to this
+#dataset (once without the outliers and another time as it is), and there was a 
+#significant improvement in performance (on test) when I had removed the outliers.
+
+#For outlier cleaning, I have used Cook's distance as a metric as it allows me 
+#to get rid of data points with a significant leverage.
+table(df$quality)
+# Get rid of outliers
+outliers = c()
+for ( i in 1:11 ) {
+  stats = boxplot.stats(df[[i]])$stats
+  bottom_outlier_rows = which(df[[i]] < stats[1])
+  top_outlier_rows = which(df[[i]] > stats[5])
+  outliers = c(outliers , top_outlier_rows[ !top_outlier_rows %in% outliers ] )
+  outliers = c(outliers , bottom_outlier_rows[ !bottom_outlier_rows %in% outliers ] )
+}
+
+#Detect/Remove outliers
+mod = lm(quality ~ ., data = df)
+cooksd = cooks.distance(mod)
+lapply(1:6, function(x) plot(mod, which=x, labels.id= 1:nrow(df))) %>% invisible()
+#these graphs show what I have been talking about earlier regardin the high 
+#leverage that some data points have
+abline(h = 20*mean(cooksd, na.rm = T), col = "red")
+head(df[cooksd > 20 * mean(cooksd, na.rm=T), ])
+coutliers = as.numeric(rownames(df[cooksd > 20 * mean(cooksd, na.rm=T), ]))
+outliers = c(outliers , coutliers[ !coutliers %in% outliers ] )
+df = df[-outliers, ]
+mod = lm(quality ~ ., data = df)
+par(mfrow=c(2,3))
+lapply(1:6, function(x) plot(mod, which=x, labels.id= 1:nrow(df))) %>% invisible()
+#much better results after the omission of the outliers
+
+
+
+range(df$quality)
+#values in population generally range on a scale from 0 to 10 but in our dataset 
+#minimum is 3 and max is 9, so no exceptional or horrible wine.
+
+table(df$quality)
+#Very few have a quality of 9 and 3. Let's see a histogram of quality
+
+str(df)
+#Only numerical variables, all continuous except for quality (which is the 
+#target variable)
+
+
+
+#This makes our life easier in the univariate EDA, as we only have to draw 
+#histograms!
+p1 <- ggplot(df, aes(x=fixed.acidity)) + ggtitle("Fixed Acidity") + 
+  xlab("Fixed acidity") + geom_histogram(fill="salmon")
+p2 <- ggplot(df, aes(x=volatile.acidity )) + ggtitle("Volatile Acidity") + 
+  xlab("Volatile acidity") + geom_histogram(fill="salmon") 
+p3 <- ggplot(df, aes(x=citric.acid)) + ggtitle("Citric acid") + xlab("Citric acid") + 
+  geom_histogram(fill="salmon") 
+p4 <- ggplot(df, aes(x=residual.sugar)) + ggtitle("residual sugar") +
+  xlab("residual sugar") + geom_histogram(fill="salmon")
+grid.arrange(p1, p2, p3, p4, ncol=2)
+
+p5 <- ggplot(df, aes(x=chlorides)) + ggtitle("Chlorides") + 
+  xlab("Chlorides") + geom_histogram(fill="salmon")
+p6 <- ggplot(df, aes(x=free.sulfur.dioxide )) + ggtitle("Free sulfur dioxide")+ 
+  xlab("Free sulfur dioxide") + geom_histogram(fill="salmon") 
+p7 <- ggplot(df, aes(x=total.sulfur.dioxide)) + ggtitle("Total sulfure dioxide") + xlab("Total sulfure dioxide") + 
+  geom_histogram(fill="salmon") 
+p8 <- ggplot(df, aes(x=pH)) + ggtitle("pH") + 
+  xlab("pH") + geom_histogram(fill="salmon")
+grid.arrange(p5, p6, p7, p8, ncol=2)
+
+p9 <- ggplot(df, aes(x=sulphates)) + ggtitle("Sulphates") + 
+  xlab("Sulphates") + geom_histogram(fill="salmon")
+p10 <- ggplot(df, aes(x=alcohol )) + ggtitle("Alcohol")+ 
+  xlab("alcohol") + geom_histogram(fill="salmon") 
+p11 <- ggplot(df, aes(x=quality)) + ggtitle("Quality") + xlab("quality") + 
+  geom_bar(fill="salmon") 
+grid.arrange(p9, p10, p11, ncol=2)
+grid.arrange(p4,p5,p6, ncol=2)
+
+
+#We notice that some variables are too skewed, I find it better to apply 
+#some transformations (there is a variety of transformations like log, sqrt, 
+#Box-Cox, Yeo-Johnon... so I will start by using log and sqrt to see which is 
+#better. Typically, we want that skewness < 1). What we could also do, and is 
+#more automatic is use "center=TRUE" later on when scaling, so R automatically
+#takes care of skewness for us. So I will comment this code anyways to provide
+#an alternative solution
+
+# skewness(df$residual.sugar)
+# df <- df %>% mutate(residual.sugar = log(residual.sugar))
+# skewness(df$residual.sugar)
+# 
+# skewness(df$chlorides)
+# df <- df %>% mutate(chlorides = log(chlorides))
+# skewness(df$chlorides)
+# 
+# skewness(df$free.sulfur.dioxide)
+# df<- df %>% mutate(free.sulfur.dioxide = sqrt(free.sulfur.dioxide))
+# skewness(df$free.sulfur.dioxide)
+
+#Check for correlation among variables
+df %>% ggcorr()
+#Nothing really alarming except the high correlation between density and residual 
+#sugar. We will see later with stepwise selection and lasso, if this is taken care 
+#of.
+
+
+#I could spend more time analyzing the localization (Averages, mean, quantiles),
+#and the variations but except the clearly skewed distributions of some of the 
+#variables, there is really nothing much to comment on from a unilateral perspective.
+#With that being said, I think it is much more interesting to take a look at the 
+#bivariate analysis
+
+#bivariate analysis:
+g1 <- ggplot(df, aes(factor(quality), fixed.acidity, fill=factor(quality))) + 
+  geom_boxplot() +
+  labs(x = "quality", y = "fixed.acidity", title = "Boxplot of Quality vs. fixed.acidity") + 
+  theme(legend.position = 'none', plot.title = element_text(size = 9, hjust=0.5))
+
+g2 <- ggplot(df, aes(factor(quality), volatile.acidity, fill=factor(quality))) + 
+  geom_boxplot() +
+  labs(x = "quality", y = "volatile.acidity", title = "Boxplot of Quality vs. volatile.acidity") + 
+  theme(legend.position = 'none', plot.title = element_text(size = 9, hjust=0.5))
+
+g3 <- ggplot(df, aes(factor(quality), citric.acid, fill=factor(quality))) + 
+  geom_boxplot() +
+  labs(x = "quality", y = "citric.acid", title = "Boxplot of Quality vs. citric.acid") + 
+  theme(legend.position = 'none', plot.title = element_text(size = 9, hjust=0.5))
+
+g4 <- ggplot(df, aes(factor(quality), residual.sugar, fill=factor(quality))) + 
+  geom_boxplot() +
+  labs(x = "quality", y = "residual.sugar", title = "Boxplot of Quality vs. residual.sugar") + 
+  theme(legend.position = 'none', plot.title = element_text(size = 9, hjust=0.5))
+ggarrange(g1, g2, g3, g4, nrow = 2, ncol =2)
+
+
+g5 <- ggplot(df, aes(factor(quality), chlorides, fill=factor(quality))) + 
+  geom_boxplot() +
+  labs(x = "Quality", y = "chlorides", title = "Boxplot of Quality vs. chlorides") + 
+  theme(legend.position = 'none', plot.title = element_text(size = 9, hjust=0.5))
+
+g6 <- ggplot(df, aes(factor(quality), free.sulfur.dioxide, fill=factor(quality))) + 
+  geom_boxplot() +
+  labs(x = "quality", y = "free.sulfur.dioxide", title = "Boxplot of quality vs. free.sulfur.dioxide") + 
+  theme(legend.position = 'none', plot.title = element_text(size = 9, hjust=0.5))
+
+g7 <- ggplot(df, aes(factor(quality), total.sulfur.dioxide, fill=factor(quality))) + 
+  geom_boxplot() +
+  labs(x = "quality", y = "total.sulfur.dioxide", title = "Boxplot of quality vs. total.sulfur.dioxide") + 
+  theme(legend.position = 'none', plot.title = element_text(size = 9, hjust=0.5))
+
+g8 <- ggplot(df, aes(factor(quality), density, fill=factor(quality))) + 
+  geom_boxplot() +
+  labs(x = "quality", y = "density", title = "Boxplot of quality vs. density") + 
+  theme(legend.position = 'none', plot.title = element_text(size = 9, hjust=0.5))
+ggarrange(g5, g6, g7, g8, nrow = 2, ncol =2)
+
+
+
+g9 <- ggplot(df, aes(factor(quality), pH, fill=factor(quality))) + 
+  geom_boxplot() +
+  labs(x = "quality", y = "pH", title = "Boxplot of Quality vs. pH") + 
+  theme(legend.position = 'none', plot.title = element_text(size = 9, hjust=0.5))
+
+g10 <- ggplot(df, aes(factor(quality), sulphates, fill=factor(quality))) + 
+  geom_boxplot() +
+  labs(x = "quality", y = "sulphates", title = "Boxplot of quality vs. sulphates") + 
+  theme(legend.position = 'none', plot.title = element_text(size = 9, hjust=0.5))
+
+g11 <- ggplot(df, aes(factor(quality), alcohol, fill=factor(quality))) + 
+  geom_boxplot() +
+  labs(x = "quality", y = "alcohol", title = "Boxplot of quality vs. alcohol") + 
+  theme(legend.position = 'none', plot.title = element_text(size = 9, hjust=0.5))
+ggarrange(g9, g10, g11, nrow = 2, ncol =2)
+ggarrange( g9, g11, ncol =2)
+#We notice an increasing trend between the quality and the alcohol level: the 
+#higher the quality the higher the alcohol level. The same can be said between 
+#pH and and quality, except that this relationship is less evident. We will 
+#investigate further later on when
+
+#--------------------END OF DATA EXPLORATION + CLEANING ------------------------
+
+#split data into train/test set
+p=ncol(df)
+train_index <- createDataPartition(df$quality, p = .9, 
+                                   list = FALSE, 
+                                   times = 1)
+traintot <- df[train_index, ]
+test <- df[-train_index, ]
+
+#Here we directly put center = TRUE instead of using skewness, as mentioned above
+trainScalenum <- traintot %>% select(-p) %>%  scale(center=TRUE, scale = TRUE)
+trainScale <- cbind(trainScalenum, quality=traintot[,p]) 
+trainScale
+testScalenum <- test %>% select(-p) %>% scale(., center=attr(trainScalenum, "scaled:center"),
+                                                           scale=attr(trainScalenum, "scaled:scale"))
+testScale <- cbind(testScalenum, quality=test[,p])
+
+trainScale <- data.frame(trainScale)
+testScale <- data.frame(testScale)
+
+
+#Split train (already scaled) into train/validation set
+train_index2 <- createDataPartition(trainScale$quality, p = .8, 
+                                   list = FALSE, 
+                                   times = 1)
+trainScaled <- trainScale[train_index2, ]
+validationScaled <- trainScale[-train_index2, ]
+
+
+
+trainScaled <- data.frame(trainScaled)
+validationScaled <- data.frame(validationScaled)
+
+
+
+set.seed(1)
+#Analysis of some variables with respect to quality to get some interesting insights
+#as requested by you and as I did in the midterm. Lower dimensional model
+myfirstfit = lm(quality~alcohol*pH, data=trainScaled)
+summary(myfirstfit)
+
+#Let's analyze what we get:
+#Suppose X1: alcohol, X2: pH
+#model is: b0 + b1(X1)' + b2(X2)' + b3(X1)'(X2)'
+#b0 = 5.94: This is E(Y) when pH and alcohol are set to their respective means
+#b1 = 0.36: This is E(ΔY) when (X2)' = 0 so when pH is equal to its mean
+#and when alcohol increases by 1 standard deviation we expect an increase in quality 
+#of 0.36, which is not negligible at all
+#b1 + b3 = 0.1 : This is E(ΔY) when (X2)' = 1 so when pH = mean(pH)+sd(pH)
+#and when alcohol increases by one sd, we expect an increase in quality of 0.44.
+#This improves slightly on the effect caused by increasing alcohol by 1 sd, but it 
+#is clear that most of the increase comes from alcohol rather than from the interaction
+#between pH and alcohol.
+#Lastly, when (X2)' = -1, so when pH = mean(pH)-sd(pH) and when alcohol increases by 
+#one sd, we get b1-b3 = 0.28, which means that we expect an increase in quality
+#of 0.28. As mentioned before, we observe that alcohol is the main driving force
+
+
+#Function that will allow us to easily evaluate our models based on specific 
+#metrics. This will allow us to have a similar comparison at the end between the 
+#different models
+myval = function(pred, actual,title= "") {
+  rmse = sqrt(mean((pred - actual)^2))
+  mae = mean(abs(pred - actual))
+  par(mfrow = c(1,2), oma = c(0, 0, 3, 0))
+  resid = pred - actual
+  plot(jitter(actual, factor = 1), 
+       jitter(pred, factor = 0.5), 
+       pch = 4, asp = 1,
+       xlab = "Truth", ylab = "Predicted") 
+  abline(0,1, lty = 2)
+  hist(resid, breaks = 20, main = NULL)
+  mtext(paste0(title), outer = TRUE)
+  return(list(rmse = rmse,
+              mae = mae
+  ))
+}
+#--------Step 2: Vanilla models -----------------------------------
+
+#Real talk, start fitting models. The procedure that I will follow is first fit 
+#VANILLA models and optimize the best models I got (models with lower mae and rmse)
+lm.fit = lm(quality~., data = trainScaled)
+lm.pred = predict(lm.fit, validationScaled[,-p])
+lm.myval = myval(lm.pred, validationScaled$quality, title = "linear model: predicted vs true"); unlist(lm.myval)
+#Difference between predicted and true quality is not too bad.
+
+
+
+# variable selection using stepwise methods
+lm_simple = lm(quality ~ ., data = trainScaled)
+lm_step = step(lm_simple, ~ fixed.acidity + volatile.acidity + 
+                                      citric.acid + residual.sugar +  chlorides + free.sulfur.dioxide +
+                                      total.sulfur.dioxide + density + pH + sulphates + alcohol, 
+                            direction = "both",trace = 0)
+summary(lm_step)
+
+lm_step_pred = predict(lm_step, validationScaled[,-p])
+lm_step_myval = myval(lm_step_pred, validationScaled$quality, title="stepwise model: predicted vs true");unlist(lm_step_myval)
+
+
+#LASSO + Elastic net + Ridge
+dat = traintot %>% as_tibble()
+X <- model.matrix(quality~.-1, data = dat)
+Y <- dat$quality
+
+
+n <- nrow(dat)
+
+#Let's resplit to satisy format of lasso
+ntr <- round(n*0.8)
+nte <- n-ntr
+trIdx <- sample(1:n, size=ntr)
+Xtr <- X[trIdx,]
+Ytr <- Y[trIdx]
+Xte <- X[-trIdx,]
+Yte <- Y[-trIdx]
+XtrS <- Xtr %>% scale()   # This standardizes Xtr
+XteS <- Xte %>% scale(., center=attr(XtrS, "scaled:center"),
+                            scale=attr(XtrS, "scaled:scale"))
+#When standardizing the test (here validation actually) set, we make sure to use 
+#center of train set or else it will be catastrophic.
+
+nlambdas <- 100
+lambdas <- seq(0.001, 2, length.out = nlambdas)
+nfolds <- 5
+
+#Lasso model
+Lasso.cv <- cv.glmnet(XtrS, Ytr, lambda=lambdas, alpha=1,
+                      family="gaussian")
+plot(Lasso.cv)
+
+
+lambdaStar <- Lasso.cv$lambda.1se
+lasso_pred = predict(Lasso.cv, XteS, s=lambdaStar)
+lasso_myval = myval(lasso_pred, Yte, title="lasso model: predicted vs true"); unlist(lasso_myval)
+
+
+
+#Ridge model
+Ridge.cv <- cv.glmnet(XtrS, Ytr, lambda=lambdas, alpha=0,
+                      family="gaussian")
+plot(Ridge.cv)
+
+
+lambdaStar <- Ridge.cv$lambda.1se
+ridge_pred = predict(Ridge.cv, XteS, s=lambdaStar)
+ridge_myval = myval(ridge_pred, Yte, title="Ridge model: predicted vs true"); unlist(ridge_myval)
+
+
+
+#Elastic net
+
+unregister_dopar()
+
+nalphas <- 20
+alphas <- seq(0, 1, length.out=nalphas)
+ctrl <- trainControl(method="cv", number=nfolds)
+elastic.caret <- caret::train(XtrS, Ytr, method = "glmnet", trControl = ctrl,
+                     tuneGrid = expand.grid(alpha = alphas, 
+                                            lambda = lambdas))
+best_alpha = elastic.caret$bestTune$alpha
+best_lambda = elastic.caret$bestTune$lambda
+
+elastic_pred = predict(elastic.caret, XteS, s=best_lambda, a = best_alpha)
+elastic_myval = myval(elastic_pred, Yte, title="elastic model: predicted vs actual"); unlist(elastic_myval)
+
+
+
+#-------Moving on to tree-based algorithms----------
+
+#Let's run a decision tree algorithm. Here I decided to use rpart instead of the 
+#method we saw in class, but tested them both and gave same results
+dtree_mod = rpart(quality~., data=trainScaled)
+rpart.plot(dtree_mod)  
+dtree_mod.pred = predict(dtree_mod, validationScaled[,-p])
+dtree_mod.myval = myval(dtree_mod.pred, validationScaled$quality, title="decision tree: predicted vs true"); unlist(dtree_mod.myval)
+
+
+# RF model
+rf_mod= randomForest(quality~., data=trainScaled, ntree=1000, mtry=3)
+rf_mod_pred = predict(rf_mod, validationScaled[,-p])
+rf_mod_myval = myval(rf_mod_pred, validationScaled$quality, title="random forest: predicted vs true"); unlist(rf_mod_myval)
+
+
+#xgboost
+fitControl = trainControl(
+  method = "cv",
+  number = 10,
+  )
+
+tune_grid =
+  expand.grid(
+    nrounds = c(50, 80),
+    eta = c(0.03,0.01),
+    max_depth=c(6, 5),
+    subsample = c(0.75, 1),
+    colsample_bytree = c(0.4, 0.6),
+    min_child_weight = c(1, 3),
+    gamma = c(0.05, 0.1)
+  )
+
+unregister_dopar()
+fit_xg_cv = caret::train(quality ~ ., data = trainScaled,
+                  method = "xgbTree",
+                  trControl = fitControl,
+                  tuneGrid = tune_grid,
+                  objective = "reg:squarederror",
+                  eval_metric = "rmse",
+                  verbose=TRUE)
+
+pred_xg_cv = predict(fit_xg_cv, validationScaled[,-p])
+xg_pred = predict(fit_xg_cv, validationScaled[,-p])
+xg_myval = myval(xg_pred, validationScaled$quality, title="xgboost: predicted vs true"); unlist(xg_myval)
+
+unregister_dopar()
+
+
+
+#GAM model with smoothing splines
+library(splines)
+fit = smooth.spline(trainScaled$density, trainScaled$alcohol,cv=TRUE)
+plot(trainScaled$residual.sugar, trainScaled$quality)
+# lines(fit,col="red",lwd=2)
+#I found optimal degrees of freedom for each variable and applied it. We see improvement
+#in results. I will not detail how I found optimal degrees of freedom for each variable
+#but I can upon request
+ga.model <- gam(quality ~ s(alcohol,12.23) + s(volatile.acidity,4) + s(sulphates,6.43) + s(chlorides,5.23) +
+                  s(total.sulfur.dioxide,5.87) + s(free.sulfur.dioxide,8.5) +  s(citric.acid, 2) + s(pH,4.35) +
+                  s(residual.sugar,23.16) + s(density,8) + s(fixed.acidity,4.3),
+                data = trainScaled)
+summary(ga.model)
+
+gam_preds <- predict(ga.model, validationScaled[,-p])
+gam_myval = myval(gam_preds, validationScaled$quality, title="GAM: predicted vs true"); unlist(gam_myval)
+
+
+#ASIDE: LM with top variables, just to see if there is improvement on full LM
+lm0 = glm(quality ~ alcohol + density + chlorides + volatile.acidity + total.sulfur.dioxide, data = trainScaled)
+lm.fit.reduced = lm(quality~ alcohol + density + chlorides + volatile.acidity + total.sulfur.dioxide, data = trainScaled)
+summary(lm.fit)
+lm.pred.reduced = predict(lm0, validationScaled[,-p])
+lm_reduced_myval = myval(lm.pred.reduced, validationScaled$quality, "LM with best features: predicted vs true"); unlist(lm_reduced_myval)
+
+
+
+knitr::kable(cbind(lm = unlist(lm.myval),
+                   # lm.interac = unlist(lm_step_myval),
+                   lasso = unlist(lasso_myval),
+                   ridge = unlist(ridge_myval),
+                   elastic.net = unlist(elastic_myval),
+                   rf = unlist(rf_mod_myval),
+                   # rf.cv = unlist(cvrf_myval),
+                   # lm.reduced = unlist(lm_reduced_myval),
+                   regression.tree = unlist(dtree_mod.myval),
+                   xgb = unlist(xg_myval),
+                   # xgb_best = unlist(best.xgb.myval),
+                   gam = unlist(gam_myval)) ,
+             
+             
+             caption = "Models for regression: ")
+
+# dfcor <- cor(df)
+# quality_cor <- dfcor[,12]
+# absoutcome_cor <- abs(quality_cor)
+# head(absoutcome_cor[order(absoutcome_cor, decreasing = TRUE)],12)
+
+
+#------------------Step 3: Optimizing best model found in 2.----------------
+#Now that we found that RF is the best performing, I will further optimize it
+#by using RF with CV
+ct = trainControl(method = "repeatedcv", number = 10, repeats = 2)
+grid_rf = expand.grid(.mtry = c(3, sqrt(p), p/3))
+
+cvrf = train(quality~., data = trainScaled,
+                method = 'rf',
+                metric = "RMSE",
+                trControl = ct,
+                tuneGrid = grid_rf)
+cvrf_pred = predict(cvrf, validationScaled[,-p])
+cvrf_myval = myval(cvrf_pred, validationScaled$quality, title="rf with CV: predicted vs true"); unlist(cvrf_myval)
+#We do not see significant improvement which means that our model was already 
+#optimal: no other hyperparameters to tune. Of course, if we increase number of 
+#repeats in ct, we may observe better results, but not significant enough.
+
+
+#fit best model (rf.cv) on TEST set and get predictions
+cvrf.off.pred = predict(cvrf, testScale[,-p])
+cvrf.off.myval = myval(cvrf.off.pred, testScale$quality, title="rf performance test set"); unlist(cvrf.off.myval)
+
+
+#Addtional optimization: this step has not led to significant improvement
+#CAN BE IGNORED, but since I worked on it I decided to put it in
+#I have decided to optimize xgboost because it has a lot of hyperparameters
+#and I thought that I could do a good job at bettering the error rate.
+
+#Finding best params for xgboost. I have to give full credit to a kaggle user 
+#who inspired me to follow this brilliant way of approaching this optimization
+#problem. This honestly takes hours to run, so if you would like to uncomment it 
+#and run it, be my guest. Anyways, I will be presenting you with the results 
+#during my presentation. I must say, for the time I put into optimizing this model
+#I was extremely deceived of the results because it slightly outperforms rf.cv in 
+#the "mae" metric but it still falls short in the "rmse" metric.
+
+#YOU CAN IGNORE THE FOLLOWING SECTION IF YOU WOULD LIKE TO, WILL BE TALKING ABOUT 
+#IT IN PRESENTATION
+
+# 
+# nrounds = 1000
+# tune_grid <- expand.grid(
+#   nrounds = seq(from = 200, to = nrounds, by = 50),
+#   eta = c(0.025, 0.05, 0.1, 0.3),
+#   max_depth = c(2, 3, 4, 5, 6),
+#   gamma = 0,
+#   colsample_bytree = 1,
+#   min_child_weight = 1,
+#   subsample = 1
+# )
+# 
+# tune_control <- caret::trainControl(
+#   method = "cv",
+#   number = 3,
+#   verboseIter = FALSE
+# )
+# 
+# xgb_tune <- caret::train(
+#   quality ~ ., data = trainScaled,
+#   trControl = tune_control,
+#   tuneGrid = tune_grid,
+#   method = "xgbTree",
+#   objective = "reg:squarederror",
+#   eval_metric = "rmse",
+#   verbose = TRUE
+# )
+# 
+# # helper function for the plots
+# tuneplot <- function(x, probs = .90) {
+#   ggplot(x) +
+#     coord_cartesian(ylim = c(quantile(x$results$RMSE, probs = probs), min(x$results$RMSE))) +
+#     theme_bw()
+# }
+# 
+# tuneplot(xgb_tune)
+# xgb_tune$bestTune
+# 
+# 
+# tune_grid2 <- expand.grid(
+#   nrounds = seq(from = 50, to = nrounds, by = 50),
+#   eta = xgb_tune$bestTune$eta,
+#   max_depth = ifelse(xgb_tune$bestTune$max_depth == 6,
+#                      c(xgb_tune$bestTune$max_depth:7),
+#                      xgb_tune$bestTune$max_depth - 1:xgb_tune$bestTune$max_depth + 1),
+#   gamma = 0,
+#   colsample_bytree = 1,
+#   min_child_weight = c(1, 2, 3),
+#   subsample = 1
+# )
+# 
+# xgb_tune2 <- caret::train(
+#   quality ~ ., data = trainScaled,
+#   trControl = tune_control,
+#   tuneGrid = tune_grid2,
+#   method = "xgbTree",
+#   objective = "reg:squarederror",
+#   eval_metric = "rmse",
+#   verbose = FALSE
+# )
+# 
+# tuneplot(xgb_tune2)
+# xgb_tune2$bestTune
+# 
+# 
+# tune_grid3 <- expand.grid(
+#   nrounds = seq(from = 50, to = nrounds, by = 50),
+#   eta = xgb_tune$bestTune$eta,
+#   max_depth = xgb_tune2$bestTune$max_depth,
+#   gamma = 0,
+#   colsample_bytree = c(0.4, 0.6, 0.8, 1.0),
+#   min_child_weight = xgb_tune2$bestTune$min_child_weight,
+#   subsample = c(0.5, 0.75, 1.0)
+# )
+# 
+# xgb_tune3 <- caret::train(
+#   quality ~ ., data = trainScaled,
+#   trControl = tune_control,
+#   tuneGrid = tune_grid3,
+#   method = "xgbTree",
+#   objective = "reg:squarederror",
+#   eval_metric = "rmse",
+#   verbose = FALSE
+# )
+# 
+# tuneplot(xgb_tune3, probs = .95)
+# 
+# 
+# xgb_tune3$bestTune
+# 
+# tune_grid4 <- expand.grid(
+#   nrounds = seq(from = 50, to = nrounds, by = 50),
+#   eta = xgb_tune$bestTune$eta,
+#   max_depth = xgb_tune2$bestTune$max_depth,
+#   gamma = c(0, 0.05, 0.1, 0.5, 0.7, 0.9, 1.0),
+#   colsample_bytree = xgb_tune3$bestTune$colsample_bytree,
+#   min_child_weight = xgb_tune2$bestTune$min_child_weight,
+#   subsample = xgb_tune3$bestTune$subsample
+# )
+# 
+# xgb_tune4 <- caret::train(
+#   quality ~ ., data = trainScaled,
+#   trControl = tune_control,
+#   tuneGrid = tune_grid4,
+#   method = "xgbTree",
+#   verbose = FALSE
+# )
+# 
+# tuneplot(xgb_tune4)
+# xgb_tune4$bestTune
+# 
+# tune_grid5 <- expand.grid(
+#   nrounds = seq(from = 100, to = 10000, by = 100),
+#   eta = c(0.01, 0.015, 0.025, 0.05, 0.1),
+#   max_depth = xgb_tune2$bestTune$max_depth,
+#   gamma = xgb_tune4$bestTune$gamma,
+#   colsample_bytree = xgb_tune3$bestTune$colsample_bytree,
+#   min_child_weight = xgb_tune2$bestTune$min_child_weight,
+#   subsample = xgb_tune3$bestTune$subsample
+# )
+# 
+# xgb_tune5 <- caret::train(
+#   quality ~ ., data = trainScaled,
+#   trControl = tune_control,
+#   tuneGrid = tune_grid5,
+#   method = "xgbTree",
+#   objective = "reg:squarederror",
+#   eval_metric = "rmse",
+#   verbose = FALSE
+# )
+# 
+# tuneplot(xgb_tune5)
+# xgb_tune5$bestTune
+# 
+# 
+# (final_grid <- expand.grid(
+#   nrounds = xgb_tune5$bestTune$nrounds,
+#   eta = xgb_tune5$bestTune$eta,
+#   max_depth = xgb_tune5$bestTune$max_depth,
+#   gamma = xgb_tune5$bestTune$gamma,
+#   colsample_bytree = xgb_tune5$bestTune$colsample_bytree,
+#   min_child_weight = xgb_tune5$bestTune$min_child_weight,
+#   subsample = xgb_tune5$bestTune$subsample
+# ))
+# 
+# train_control <- caret::trainControl(
+#   method = "none",
+#   verboseIter = FALSE, # no training log
+#   allowParallel = TRUE # FALSE for reproducible results
+# )
+# 
+# (xgb_model <- caret::train(
+#   quality ~ ., data = trainScaled,
+#   trControl = train_control,
+#   tuneGrid = final_grid,
+#   method = "xgbTree",
+#   objective = "reg:squarederror",
+#   eval_metric = "rmse",
+#   verbose = FALSE
+# ))
+# 
+# best_xgb_mod = predict(xgb_model, validationScaled[,-p])
+# best.xgb.myval = myval(best_xgb_mod, validationScaled$quality, title="Boosting: predicted vs actual"); unlist(best.xgb.myval)
+# 
+
+
+

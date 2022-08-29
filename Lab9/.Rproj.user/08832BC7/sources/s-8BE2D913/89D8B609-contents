@@ -1,0 +1,150 @@
+
+# Packages ----------------------------------------------------------------
+
+require(tidyverse)
+require(magrittr)
+require(ISLR)
+require(glmnet)
+require(gglasso)
+
+
+# Data --------------------------------------------------------------------
+
+datlist <- gglasso::bardet
+?gglasso::bardet
+
+# Organizing data ---------------------------------------------------------
+
+# Putting data in a dataframe
+X <- datlist$x
+colnames(X) <- paste0("X_", rep(1:20, each=5), ".", rep(1:5, times=20))
+Y <- datlist$y
+dat <- bind_cols(Y=Y, X)
+n <- nrow(dat)
+
+# Checking for duplicates
+dat %>% duplicated() %>% sum
+
+# Checking for NAs
+dat %>% summarise_all(function(x) any(is.na(x))) %>% unlist()
+
+# Split train-test: Test set is not the validation set!
+set.seed(130494)
+ntr <- round(n*0.8)
+nte <- n-ntr
+trIdx <- sample(1:n, size=ntr)
+
+
+dattr <- dat[trIdx, ]
+datte <- dat[-trIdx, ]
+
+# All numerical
+Xtr <- X[trIdx,] %>% scale()
+Ytr <- Y[trIdx]
+Xte <- X[-trIdx,] %>% scale(center=attr(Xtr, "scaled:center"), 
+                            scale=attr(Xtr, "scaled:scale"))
+Yte <- Y[-trIdx]
+
+
+# Linear Model? --------------------------------------------------------------
+
+oo <- lm(Y~., data=dattr)
+summary(oo)
+
+# Performances on the test set?
+lm_pred <- predict(oo, newdata = datte)
+# MSE
+mean((lm_pred-Yte)^2)  # Is this large?
+mean((lm_pred-Yte)^2)/var(Yte)
+mean((lm_pred-Yte)^2)/mean((Yte-mean(Ytr))^2)
+
+# Ridge regression --------------------------------------------------------
+
+# Automatic CV
+set.seed(130494)
+Ridge.cv <- cv.glmnet(Xtr, Ytr, alpha=0, nfolds = 5)
+plot(Ridge.cv) # CV plot
+plot(Ridge.cv$glmnet.fit, xvar="lambda") # Shrinking plot
+
+# Check coefficients
+coef(Ridge.cv, s=Ridge.cv$lambda.1se)
+
+# Performances
+Ridge_trPred <- predict(Ridge.cv, Xtr, s=Ridge.cv$lambda.1se)
+1-mean((Ridge_trPred-Ytr)^2)/var(Ytr)
+
+Ridge_tePred <- predict(Ridge.cv, Xte, s=Ridge.cv$lambda.1se)
+mean((Ridge_tePred-Yte)^2)/var(Yte)
+mean((Ridge_tePred-Yte)^2)/mean((Yte-mean(Ytr))^2)
+
+
+# Lasso Regression -------------------------------------------------------------------
+
+# Automatic CV
+set.seed(130494)
+Lasso.cv <- cv.glmnet(Xtr, Ytr, alpha=1, nfolds = 5)
+plot(Lasso.cv) # CV plot
+plot(Lasso.cv$glmnet.fit, xvar="lambda") # Shrinking plot
+abline(v=log(Lasso.cv$lambda.1se), lwd=2) # Shrinking plot
+
+# Check coefficients
+coef(Lasso.cv, s=Lasso.cv$lambda.1se)
+
+# Performances
+Lasso_trPred <- predict(Lasso.cv, Xtr, s=Lasso.cv$lambda.1se)
+mean((Lasso_trPred-Ytr)^2)/var(Ytr)
+
+Lasso_tePred <- predict(Lasso.cv, Xte, s=Lasso.cv$lambda.1se)
+mean((Lasso_tePred-Yte)^2)/var(Yte)
+mean((Lasso_tePred-Yte)^2)/mean((Yte-mean(Ytr))^2)
+
+# Relaxed fit?
+set.seed(130494)
+Lasso.cv_relaxed <- cv.glmnet(Xtr, Ytr, alpha=1, nfolds = 5, relax = T)
+plot(Lasso.cv_relaxed) # CV plot
+
+Lasso.cv_relaxed$relaxed$lambda.1se
+Lasso.cv_relaxed$relaxed$gamma.1se
+
+
+# Check coefficients
+coef(Lasso.cv_relaxed, s="lambda.1se", gamma="gamma.1se")
+
+# Performances
+Lasso_trPred_rel <- predict(Lasso.cv_relaxed, Xtr, s="lambda.1se", gamma="gamma.1se")
+mean((Lasso_trPred_rel-Ytr)^2)/var(Ytr)
+
+Lasso_tePred_rel <- predict(Lasso.cv_relaxed, Xte, s="lambda.1se", gamma="gamma.1se")
+mean((Lasso_tePred_rel-Yte)^2)/var(Yte)
+mean((Lasso_tePred_rel-Yte)^2)/mean((Yte-mean(Ytr))^2) # We perform worse! Why?
+
+
+# Elastic net -------------------------------------------------------------
+
+# Find the best elastic net!
+
+
+# The Grouped Lasso ----------------------------------------------------------------
+
+?gglasso
+
+gglasso.cv <- cv.gglasso(Xtr, Ytr, rep(1:20, each=5))
+gglasso.cv
+plot(gglasso.cv)
+plot(gglasso.cv$gglasso.fit)
+
+coef(gglasso.cv, s = gglasso.cv$lambda.min)
+
+# Performances
+ggLasso_trPred <- predict(gglasso.cv, Xtr, s="lambda.min")
+mean((ggLasso_trPred-Ytr)^2)/var(Ytr)
+
+gglasso_tePred <- predict(gglasso.cv, Xte, s="lambda.min")
+mean((gglasso_tePred-Yte)^2)/var(Yte)
+mean((gglasso_tePred-Yte)^2)/mean((Yte-mean(Ytr))^2) # Does not improve much
+
+
+
+
+# Repeat the analysis on the colon data
+# The outcome is either -1 or 1. What changes?

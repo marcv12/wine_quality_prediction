@@ -1,0 +1,3 @@
+"0","# Plot the performances in AUC"
+"0","plot(kList, aucKNN_In, type=""b"", lwd=2, ylim=c(0.8, 1), main=""AUC train VS test"","
+"0","     ylab=""AUC"")"

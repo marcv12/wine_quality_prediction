@@ -1,0 +1,8 @@
+"0","X_train <- train %>% dplyr::select(Total_Trans_Amt, Total_Trans_Ct)"
+"0","X_val <- validation %>% dplyr::select(Total_Trans_Amt, Total_Trans_Ct)"
+"0","Y_train <- train %>% pull(Closed_Account) # And the outcome also, obviously"
+"0","Y_val <- validation %>% pull(Closed_Account)"
+"0",""
+"0",""
+"0","#we proceed to scale training set"
+"0","X_trainScaled <- X_train %>% scale() %>% as_tibble()"

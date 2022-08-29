@@ -1,0 +1,2 @@
+"0",""
+"0","boxplot(df_train$Credit_Limit, main=""Credit limit"")"

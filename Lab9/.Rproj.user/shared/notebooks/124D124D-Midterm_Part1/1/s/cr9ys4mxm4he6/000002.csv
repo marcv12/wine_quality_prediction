@@ -1,0 +1,6 @@
+"0","# df_train %>% "
+"0","#   select(Customer_Age, Dependent_count, Months_on_book, Income, Months_Inactive_12_mon,"
+"0","#          Credit_Limit, Total_Revolving_Bal, Avg_Open_To_Buy, Total_Amt_Chng_Q4_Q1,"
+"0","#          Total_Trans_Amt, Total_Relationship_Count, Contacts_Count_12_mon,"
+"0","#          Total_Trans_Ct, Total_Ct_Chng_Q4_Q1, Avg_Utilization_Ratio) %>% "
+"0","#   cor()"

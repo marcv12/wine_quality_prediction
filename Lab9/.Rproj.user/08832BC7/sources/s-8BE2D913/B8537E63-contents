@@ -1,0 +1,462 @@
+library(tidyverse)
+library(ISLR)
+
+set.seed(123)
+data(Auto)
+summary(Auto)
+
+
+Y = Auto$mpg 
+X = Auto$horsepower + rnorm(nrow(Auto), sd=0.01)
+# use 80% obs as training
+idx_tr = sample(length(X), floor(0.8*length(X)))
+df = data.frame(X=X, Y=Y)
+df_tr = df[idx_tr,]
+df_te = df[-idx_tr,]
+
+
+plot(df_tr$X, df_tr$Y, pch=16, col="#00000060", xlab="X", ylab="Y")
+points(df_te$X, df_te$Y, pch=16, col="#f0000060")
+
+# consider several possible polynomial models
+form_list = lapply(1:13, function(i) as.formula(paste0("Y ~ poly(X,",i,", raw=T)")))
+
+m_list = lapply(form_list, lm, data = df_tr)
+# m_list = list(m1, m2, m3, m4, m5, m6, m7, m8)
+map(m_list, summary)
+
+m_list[[2]]
+# get fitted values
+pred_tr = 
+  lapply(m_list, predict.lm)
+# compute predictions on test (validation) 
+pred_te = 
+  lapply(m_list, predict.lm, newdata = df_te[1])
+
+mse = function(y_pred, y) mean((y - y_pred)^2)
+mse_tr = sapply(pred_tr, mse, y = df_tr$Y)
+mse_te = sapply(pred_te, mse, y = df_te$Y)
+
+plot(mse_tr, pch=16, col=4, type="b", ylim=c(15, 35), ylab="MSE", xlab="Degree")
+points(mse_te, pch=16, col="#00000080", type="b")
+
+
+
+
+# compare validation set, loo-cv, 10-fold-cv
+par(mfrow=c(1,2))
+plot(mse_te, pch=16, col="#00000080", type="b", ylim=c(15, 35), ylab="MSE", xlab="Degree",
+     main = "Validation set")
+
+# variability induced by validation set choice
+foo = function() { 
+  idx_tr = sample(length(X), floor(0.5*length(X)))
+  df = data.frame(X=X, Y=Y)
+  df_tr = df[idx_tr,]
+  df_te = df[-idx_tr,]
+   
+  m_list = lapply(form_list, lm, data = df_tr)
+  map(m_list, summary)
+  
+  pred_tr = 
+    lapply(m_list, predict.lm)
+  pred_te = 
+    lapply(m_list, predict.lm, newdata = df_te[1])
+  
+  mse_tr = sapply(pred_tr, mse, y = df_tr$Y)
+  mse_te = sapply(pred_te, mse, y = df_te$Y)
+  
+  points(mse_te, pch=16, col="#00000040", type="b")
+  
+}
+
+
+replicate(n = 25, expr = foo())
+#like 25 students computing this error 25 times
+#We notice a lot of variability, which is one of the downsides of validation set 
+#approach.
+
+# loocv
+m_loo = lapply(form_list, lm, data = df)
+
+cv_loo = function(mod){
+  mean((residuals(mod)/(1 - hatvalues(mod)))^2)
+}
+
+cv_loos = sapply(m_loo, cv_loo)
+
+points(cv_loos, pch=16, col="#53198C90", type="b")
+
+
+library(boot)
+library(rlang)
+
+plot(cv_loos, pch=16, col="#53198C90", type="b", ylim=c(15, 35), ylab="MSE", xlab="Degree", main = "10-fold CV")
+
+# variability induced by cross validation choices
+foo = function(){
+  # fit model using glm! (lm is "included" as a special case of glm)
+  m_k = map(form_list, glm, data = df)
+  # technical fix 
+  m_k = map(m_k, function(.x){
+    .x$call = call2("glm", !!!list(formula = .x$formula, data = df))
+    return(.x)
+  })
+  cv_k = map_dbl(m_k, ~cv.glm(data=df, glmfit = .x, K=10)$delta[1])
+  points(cv_k, pch=16, col="#FFB16260", type="b")
+  
+}
+replicate(n = 25, expr = foo())
+points(cv_loos, pch=16, col="#53198C90", type="b")
+legend("topleft", "LOO-CV", lty=1, pch=16, col="#53198C90")
+
+
+
+m_temp = glm(Y~X, data=df)
+
+summary(m_temp)
+cv_mod = cv.glm(data=df, glmfit = m_temp, K=10)
+cv_mod$delta[1]
+#CV also has some variability that comes from the choice of the folds (each of
+#us are choosing different folds, but since we are averaging everything, we are 
+#mitigating the effect of randomness). 10-fold has less variability than anything.
+#if you get some other data from same population, LOO tends to vary more than 
+#k-folds with k<n.
+
+# classification 
+
+
+# let's simulate some data 
+set.seed(1)
+
+# true conditional probability P(Y=1 | X = x) (X here is the vector (X1, X2))
+prob_true = function(x1, x2, b0=0, b1=1, b2=-0, b3=0.2, b4=0.1){
+  plogis(b0 + b1*x1 + b1*x2 + b3*x1*x2 - b4*x2^3)
+}
+
+# show on a grid
+x1 = seq(-4, 4, l=100)
+x2 = seq(-4, 4, l=100)
+X_sim = expand.grid(x1=x1, x2=x2)
+z = outer(x1, x2, prob_true)
+
+# simulate observations from conditional distribution:
+# draw y in {0,1} at random for each each x with prob P(Y=1|X=x)
+simulate_class = function(x){
+  p = prob_true(x[1], x[2])
+  sample(x=0:1, size=1, prob=c(1-p, p))
+} 
+
+# select some X points
+idx_data = sample(x=nrow(X_sim), size=750, replace = F)
+X_data = X_sim[idx_data,]
+# draw y
+y_data = X_data %>%
+  apply(1, simulate_class)
+
+
+# split in train and test
+df_obs = X_data[1:500,]
+df_test = X_data[501:750,]
+
+df_obs$class = as.factor(y_data[1:500])
+df_test$class = as.factor(y_data[501:750])
+
+
+# optimal ("bayes") boundary: set of points where true cond prob is 0.5
+x1_0 = seq(-4, 4, l=500)
+x2_0 = seq(-4, 4, l=500)
+
+b_line = contourLines(x=x1_0, y = x2_0, z = outer(x1_0, x2_0, prob_true), levels = 0.5)
+df_bay = data.frame(x=b_line[[1]]$x, y=b_line[[1]]$y)
+
+# bayes classifier
+# ideal subdivision of the plane:
+X_sim = X_sim %>%
+  mutate(prob_1 = prob_true(x1, x2),
+         class_bay = as.factor(ifelse(prob_1 > 0.5, 1, 0)))
+
+p_bay = 
+  X_sim %>%
+  ggplot(aes(x=x1, y=x2))+
+  geom_point(aes(col=class_bay), alpha=0.7, pch = 4, size=0.5) + 
+  geom_path(data=df_bay, mapping=aes(x=x, y=y)) + 
+  scale_color_manual(values = c("#481568FF", "#FDE725FF"))+
+  coord_fixed() +
+  labs(x=quote(X[1]),
+       y=quote(X[2]))
+
+p_bay
+
+
+
+
+
+
+# cross validation for knn --------------------------------
+library(class)
+library(caret)
+
+tr_contr = trainControl(method  = "cv",
+                          number  = 10)
+knn_cv = train(class ~ .,
+             method     = "knn",
+             tuneGrid   = data.frame(k = 1:50),
+             trControl  = tr_contr,
+             metric     = "Accuracy",
+             data       = df_obs)
+
+knn_cv
+
+par(mfrow=c(1,1))
+plot(-knn_cv$results$k, 1- knn_cv$results$Accuracy, type="b", 
+     xlab = "Complexity (-k)", ylab="CV10 error", pch=16, col="#4393D9b0", cex=0.7, ylim=c(0.15, 0.25))
+
+
+# train and test error
+
+err_rate = function(k, df_pred){
+  k_class = knn(train=df_obs[,1:2], test = df_pred[,1:2], k=k, cl=df_obs$class)
+  err_rate = mean(k_class != df_pred$class)
+}
+
+tr_err_rates = sapply(1:50, err_rate, df_pred = df_obs)
+te_err_rates = sapply(1:50, err_rate, df_pred = df_test)
+
+points(-50:-1, rev(tr_err_rates), type = "b", cex=0.6, col="#00000080")
+points(-50:-1, rev(te_err_rates), type = "b", pch=16, cex=0.6, col="#FFB162a0")
+# gray train, blue cv, orange test
+
+
+tr_contr = trainControl(method  = "LOOCV")
+knn_loo = train(class ~ .,
+               method     = "knn",
+               tuneGrid   = data.frame(k = 1:50),
+               trControl  = tr_contr,
+               metric     = "Accuracy",
+               data       = df_obs)
+
+knn_loo
+plot(-knn_cv$results$k, 1- knn_cv$results$Accuracy, type="b", 
+     xlab = "Complexity (-k)", ylab="LOO error", pch=16, col="#4393D9b0", cex=0.7, ylim=c(0.15, 0.3))
+#we get error by doing 1-accuracy
+
+points(-50:-1, 1- knn_loo$results$Accuracy,, type = "b", pch=16, cex=0.6, col="#00000060")
+points(-50:-1, rev(te_err_rates), type = "b", pch=16, cex=0.6, col="#FFB162a0")
+# gray loo, blue cv, orange test
+
+
+# bootstrap ------------------------------------------------------------
+
+# linear regression example
+set.seed(1)
+library(boot)
+
+boot_foo = function(data, index){
+  m1 = lm(mpg ~ horsepower, data = data, subset = index)
+  return(coef(m1)[2])
+}
+
+# example
+boot_foo(data = Auto, index = sample(392, 100))
+
+
+# boot takes care of everything
+B = 1e3
+boot(data = Auto, statistic = boot_foo, R = B)
+
+# compare with exact standard error
+summary(lm(mpg ~ horsepower, data = Auto))
+
+
+
+
+
+# exercises -----------------------------------------------------------------------------------
+
+# investment strategy 
+data("Portfolio")
+summary(Portfolio)
+dev.off()
+ggplot(Portfolio, aes(x=X, y=Y)) + 
+  geom_point()
+
+# optimal allocation
+alpha_hat = with(Portfolio, (var(Y) - cov(X, Y))/(var(X) + var(Y) - 2*cov(X, Y)))
+alpha_hat
+
+# follow the structure required by boot pkg
+alpha_star = function(data, index){
+  X_s = data$X[index]
+  Y_s = data$Y[index]
+  alpha_s = (var(Y_s) - cov(X_s, Y_s))/(var(X_s) + var(Y_s) - 2*cov(X_s, Y_s))
+  return(alpha_s)
+}
+
+
+set.seed(1)
+alpha_boot = boot(data = Portfolio, statistic = alpha_star, R = 1e3)
+se_boot = sd(alpha_boot$t)
+
+# confint for alpha hat
+c(alpha_hat - 2*se_boot, alpha_hat + 2*se_boot )
+
+
+
+
+
+set.seed(123)
+# check boostrap "coverage"
+
+n_obs = 1e4
+obs = 1:n_obs
+
+boot_coverage = function(){
+  mean(obs %in% sample(obs, size=n_obs, replace = T))
+}
+
+res = replicate(expr = boot_coverage(), n = 1e4)
+mean(res)
+1 - exp(-1)
+
+
+
+# include variable using cv, estimate test error
+
+library(ISLR)
+library(boot)
+library(pROC)
+library(tidyverse)
+data("Default")
+summary(Default)
+
+idx_train = sample(1e4, 7e3)
+Default_tr = Default[idx_train,]
+Default_te = Default[-idx_train,]
+
+
+m0 = glm(default ~ income + balance, data = Default_tr, family = binomial())
+
+# need to specify a cost function: misclass error
+cost = function(y_obs, y_prob) {
+  y_pred = ifelse(y_prob>0.5, 1, 0)
+  err = mean(y_obs != y_pred)
+  return(err)
+}
+
+# using 10 fold CV
+cv.glm(data = Default_tr, glmfit = m0, cost = cost, K = 10)$delta[1]
+
+y_prob_test = predict(m0, Default_te, type="response")
+cost(y_obs = as.numeric(Default_te$default)-1, y_prob = y_prob_test  )
+
+
+m1 = glm(default ~ income + balance + student, family = binomial(), data = Default_tr)
+m2 = glm(default ~ income + balance, family = binomial(), data = Default_tr)
+
+summary(m1)
+summary(m2)
+
+
+# student is significant but income is not. if student removed income is siginficant. Which model should we choose?
+
+# using LOOCV..
+#cv.glm()
+
+# using 10 fold CV
+cv10_stud = cv.glm(data = Default_tr, glmfit = m1, cost = cost, K = 10)$delta[1]
+cv10_nostud = cv.glm(data = Default_tr, glmfit = m2, cost = cost, K = 10)$delta[1]
+cv10_stud
+cv10_nostud
+
+# another possible cost function: use AUC
+cost2 = function(y_obs, y_prob) { # it'a cost
+  1 - auc(y_obs, y_prob, quiet = T)
+}
+cv10_studA = cv.glm(data = Default_tr, glmfit = m1, cost = cost2, K=10)$delta[1]
+cv10_nostudA = cv.glm(data = Default_tr, glmfit = m2, cost = cost2, K=10)$delta[1]
+cv10_studA
+cv10_nostudA
+
+mean(as.numeric(Default_tr$default)-1)
+
+
+
+
+
+
+# direction dataset
+
+data("Weekly")
+summary(Weekly)
+
+ggplot(Weekly, aes(x=Lag1, y=Lag2, col=Direction))+
+  geom_point()
+
+Weekly_tr = filter(Weekly, Year < 2008)
+Weekly_te = filter(Weekly, Year >= 2008)
+
+m1 = glm(Direction ~ Lag1 + Lag2, family=binomial(), data = Weekly_tr)
+
+loo_fun = function(i){
+ m_i = glm(Direction ~ Lag1 + Lag2, family=binomial(), data = Weekly_tr[-i, ])
+ prob_i = predict(m_i, Weekly_tr[i, ], type="response" )
+ pred_i = as.factor(ifelse(prob_i > 0.5, "Up", "Down"))
+ err_i = pred_i != Weekly_tr[i, "Direction" ]
+ return(err_i)
+}
+
+err = logical(nrow(Weekly_tr))
+for(i in 1:nrow(Weekly_tr)){
+  err[i] = loo_fun(i)
+}
+# LOOCV estimate of test error
+mean(err)
+
+prob_te = predict(m1, Weekly_te, type="response" )
+pred_te = as.factor(ifelse(prob_te > 0.5, "Up", "Down"))
+err_te = pred_te != Weekly_te[, "Direction" ]
+mean(err_te)
+
+# not a very good model
+table(Weekly_tr$Direction)/nrow(Weekly_tr)
+
+
+
+
+# compute bootstrap confidence interval for predicted probability
+Weekly_tr = Weekly[-nrow(Weekly), ]
+Weekly_te = Weekly[nrow(Weekly), ]
+
+m2 = glm(Direction ~ Lag1 + Lag2, family=binomial(), data = Weekly_tr)
+prob_l = predict(m2, Weekly_te, type="response" )
+
+
+
+boot_foo = function(data, index){
+  m_s = glm(Direction ~ Lag1 + Lag2, family=binomial(), data = data, subset = index)
+  prob_s = predict(m_s, Weekly_te, type="response" )
+  return(prob_s)
+}
+
+boot_foo = function(data, index){
+  prob_s = knn(Weekly_tr[index, 2:3], Weekly_te[, 2:3], cl = Weekly_tr$Direction[index], k=30, prob = T)
+  return(attr(prob_s, "prob"))
+}
+
+B = 1e3
+boot_probs = boot(data = Weekly_tr, statistic = boot_foo, R = B)
+# pred se
+prob_se = sd(boot_probs$t)
+prob_se
+# ci
+c(prob_l - 2*prob_se, prob_l + 2*prob_se)
+
+#ME
+n= dim(Weekly)[1]
+glm.fit = glm(Direction ~ Lag1 + Lag2, data = Weekly[1:n-1, ],  family = binomial)
+summary(glm.fit)
+Weekly[n,]
+
+
+

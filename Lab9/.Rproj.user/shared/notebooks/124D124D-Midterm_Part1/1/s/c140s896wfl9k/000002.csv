@@ -1,0 +1,3 @@
+"0","train_m <- X_train %>% summarise(across(where(is.numeric), mean))"
+"0","train_s <- X_train %>% summarise(across(where(is.numeric), sd))"
+"0","X_valScaled <- X_val %>% scale(center=train_m, scale=train_s) %>% as_tibble()"

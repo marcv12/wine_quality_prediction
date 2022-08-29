@@ -1,0 +1,4 @@
+"0","df_train$Avg_Open_To_Buy <- NULL"
+"0","df_test$Avg_Open_To_Buy <- NULL"
+"0","# df_train$Total_Trans_Ct <- NULL"
+"0","# df_test$Total_Trans_Ct <- NULL"

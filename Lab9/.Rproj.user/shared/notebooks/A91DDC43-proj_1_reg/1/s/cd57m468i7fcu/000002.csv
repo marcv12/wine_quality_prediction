@@ -1,0 +1,5 @@
+"0","#Ignore this function, I use this when caret (interference with doParallel lib)"
+"0","unregister_dopar <- function() {"
+"0","  env <- foreach:::.foreachGlobals"
+"0","  rm(list=ls(name=env), pos=env)"
+"0","}"

@@ -1,0 +1,18 @@
+"0","p5 <- ggplot(df_train, aes(x=Customer_Age)) + ggtitle(""Customer Age"") + "
+"0","  xlab(""Customer_Age"") + geom_histogram(fill=""salmon"")"
+"0","p6 <- ggplot(df_train, aes(x=Months_on_book )) + ggtitle(""Months_on_book"") + "
+"0","  xlab(""Months_on_book"") + geom_histogram(fill=""salmon"") "
+"0","p7 <- ggplot(df_train, aes(x=Income)) + ggtitle(""Income"") + xlab(""Income"") + "
+"0","  geom_histogram(fill=""salmon"") + geom_boxplot()"
+"0","p8 <- ggplot(df_train, aes(x=Months_Inactive_12_mon)) + ggtitle(""Months inactive(last_y)"") +"
+"0","  xlab(""Months Inactive"") + geom_bar(fill=""salmon"")"
+"0","grid.arrange(p5, p6, p7, p8, ncol=2)"
+"2","`stat_bin()` using `bins = 30`. Pick better value
+with `binwidth`.
+"
+"2","`stat_bin()` using `bins = 30`. Pick better value
+with `binwidth`.
+"
+"2","`stat_bin()` using `bins = 30`. Pick better value
+with `binwidth`.
+"

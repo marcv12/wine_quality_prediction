@@ -1,0 +1,4 @@
+"0","df_train %>%"
+"0","  filter(Total_Amt_Chng_Q4_Q1<1700) %>%"
+"0","  select(Total_Amt_Chng_Q4_Q1) %>%"
+"0","  boxplot(main=""Total amount change"")"

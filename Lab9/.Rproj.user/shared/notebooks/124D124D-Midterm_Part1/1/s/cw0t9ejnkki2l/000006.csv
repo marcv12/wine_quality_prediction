@@ -1,0 +1,13 @@
+"0","p13 <- ggplot(df_train, aes(x=Contacts_Count_12_mon)) + ggtitle(""Number of contacts(this year)"") + "
+"0","  xlab(""Number of contacts"") + geom_bar(fill=""salmon"")"
+"0","p14 <- ggplot(df_train, aes(x=Total_Trans_Amt )) + ggtitle(""Total transaction amount(this year)"")+ "
+"0","  xlab(""Total transaction amount"") + geom_histogram(fill=""salmon"") "
+"0","p15 <- ggplot(df_train, aes(x=Avg_Utilization_Ratio)) + ggtitle(""Average card utilization ratio"") + "
+"0","  xlab(""Average utilization ratio"") + geom_histogram(fill=""salmon"") "
+"0","grid.arrange(p13, p14, p15, ncol=2)"
+"2","`stat_bin()` using `bins = 30`. Pick better value
+with `binwidth`.
+"
+"2","`stat_bin()` using `bins = 30`. Pick better value
+with `binwidth`.
+"

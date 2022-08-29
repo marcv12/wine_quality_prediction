@@ -1,0 +1,7 @@
+"0","coutliers = as.numeric(rownames(df[cooksd > 20 * mean(cooksd, na.rm=T), ]))"
+"0","outliers = c(outliers , coutliers[ !coutliers %in% outliers ] )"
+"0","df = df[-outliers, ]"
+"0",""
+"0","mod = lm(quality ~ ., data = df)"
+"0","par(mfrow=c(2,3))"
+"0","lapply(1:6, function(x) plot(mod, which=x, labels.id= 1:nrow(df))) %>% invisible()"

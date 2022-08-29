@@ -1,0 +1,9 @@
+"0","# On the train set"
+"0","library(pROC)"
+"0","ROCAic <- roc(train$Closed_Account, myfit2.AIC$fitted.values, plot = TRUE,"
+"0","              legacy.axes=TRUE, col=""midnightblue"", lwd=3,"
+"0","              auc.polygon=T, auc.polygon.col=""lightblue"", print.auc=T)"
+"2","Setting levels: control = no, case = yes
+"
+"2","Setting direction: controls < cases
+"

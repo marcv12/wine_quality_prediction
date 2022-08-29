@@ -1,0 +1,2 @@
+"0","par(mfrow=c(2,2))"
+"0","boxplot(df_train$Customer_Age, main=""Customer Age"")"

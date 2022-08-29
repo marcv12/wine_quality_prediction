@@ -1,0 +1,483 @@
+#Lab 2: Exploring a data set
+#TA's email: gcaruso@luiss.it
+#
+#
+#Before starting:
+#
+#1) Download the file NHANES.csv from Learn
+#
+#2) Check the directory in which the file has been downloaded
+#   (probably it will be 'Downloads'...)
+#
+#3) Set the directory where the .csv file is as working directory:
+#   you'll be able to import files to R from this directory henceforth 
+#
+#   setwd(...) #where "..." stands for the path
+#   e.g. I use this: setwd("C:/Users/gianm/Downloads")
+#
+#   since the .csv file is in the Downloads directory
+#
+#4*) If you move the file, remember to set the new working directory!
+
+
+#------------------ Let's begin -------------------#
+
+
+#The National Health and Nutrition Examination Survey (NHANES) is a survey research program 
+#conducted by the National Center for Health Statistics (NCHS) to assess 
+#the health and nutritional status of adults and children in the United States.
+#The survey combines interviews, physical examinations and laboratory tests.
+
+### (!) REMEMBER TO SET THE CORRECT DIRECTORY (read above) ###
+
+d=read.csv(file="NHANES.csv",
+           header=T,
+           sep=",",
+           dec=".",
+           stringsAsFactors = T)
+
+
+View(d)
+str(d) #take a look at the structure of the data frame
+dim(d)
+
+head((d$Gender))
+factor(d$Gender)
+levels(d$Gender)
+#Factor: qualitative variable (e.g. "Gender")
+#Level: modality of a given factor (e.g. "female")
+
+
+
+#Reducing the number of variables (arbitrarily) ------------
+
+#install.packages("tidyverse",dependencies = T) #if not installed yet...
+require(tidyverse) #load the package
+
+#We just want to select some columns
+
+dd = 
+  d %>% 
+  select(Gender,Age,Education,MaritalStatus,Work,HomeRooms,
+         Weight,Height,BMI,Testosterone,SmokeNow,RegularMarij,
+         PhysActiveDays,SleepHrsNight,SexNumPartnLife,Diabetes)
+
+View(dd)
+
+
+#Some quick summary and plot ---------
+
+
+## Quantitative continuous variables:
+
+summary(dd$BMI)   
+
+#alternatively, we can work with tidyverse (as you prefer...)
+
+dd %>% 
+  select(BMI) %>%   #extracting a DATA FRAME with only 1 column from dd
+  summary()
+
+dd %>% 
+  pull(BMI) %>%   #extracting a VECTOR from dd
+  summary()
+
+
+sd(dd$BMI)  #standard deviation
+var(dd$BMI) #variance
+IQR(dd$BMI) #interquartile range (difference between 3rd and 1st quartile)
+
+#(?)...and what about the mode? Nonsense for continuous variables.
+
+
+par(mfrow=c(1,2))
+
+hist(dd$BMI,col = "wheat") #NB: it implicitly groups data in classes; the modal class is available
+boxplot(dd$BMI,col = "wheat")
+
+
+#Correlation and pairwise scatterplots
+
+dd %>% 
+  select(Weight,Height,BMI,Testosterone) %>% 
+  drop_na() %>% 
+  cor()
+
+
+# (!) WATCH OUT: the following code returns a different correlation matrix:
+
+dd %>% 
+  drop_na() %>% 
+  select(Weight,Height,BMI,Testosterone) %>% 
+  cor()
+
+#WRONG!!!
+#(?) ...why? 
+#Because we should drop NA's AFTER selecting the variables, not before.
+#Otherwise, we discard useful information...
+
+
+dd %>% 
+  select(Weight,Height,BMI,Testosterone) %>% 
+  drop_na() %>%                                
+  pairs()
+
+
+#Focus on single scatterplots
+par(mfrow=c(2,2))
+
+
+dd %>% 
+  select(Weight,BMI) %>% 
+  drop_na %>% 
+  plot(pch=19,col="darkblue",cex=0.4)
+
+dd %>% 
+  select(Weight,Testosterone) %>% 
+  drop_na %>% 
+  plot(pch=19,col="darkblue",cex=0.4)
+
+dd %>% 
+  select(Weight,Height) %>% 
+  drop_na %>% 
+  plot(pch=19,col="darkblue",cex=0.4)
+
+dd %>% 
+  select(Height,BMI) %>% 
+  drop_na %>% 
+  plot(pch=19,col="darkblue",cex=0.4)
+
+#alternatively:
+# plot(dd$Weight,dd$BMI,pch=19,col="darkblue",cex=0.4)
+
+dev.off() #reset plot settings
+
+## Quantitative discrete variable:
+
+head(dd$HomeRooms) 
+
+summary(dd$HomeRooms)
+table(dd$HomeRooms) #freq distribution
+people_without_HomeRooms=sum(is.na(dd$HomeRooms))
+table(dd$HomeRooms)/(length(dd$HomeRooms)-people_without_HomeRooms) #relative frequency distribution 
+
+
+#Plot the number of home rooms 
+
+hist(dd$HomeRooms)
+
+#(?) Is the histogram the correct graph? 
+#Not really. For discrete variables is more meaningful to use barplots
+
+barplot(dd$HomeRooms)  #It's a mess!
+
+#let's build the frequency distribution
+
+freq_HomeRooms = table(dd$HomeRooms)
+barplot(freq_HomeRooms,ylab="Frequency",col=rainbow(30)) #Ops, maybe too much colour...
+
+
+#(?) Compute the mode of HomeRooms
+
+#strategy 1
+dd %>% 
+  select(HomeRooms) %>% 
+  table() %>% 
+  which.max() %>% 
+  labels()
+
+#strategy 2
+which(freq_HomeRooms==max(freq_HomeRooms))[[1]]
+
+#strategy 3
+which.max(freq_HomeRooms)[[1]]
+
+
+## Qualitative variable:
+
+summary(dd$Work) #include NA's
+table(dd$Work)   #NA's automatically removed
+
+work_without_NA = dd$Work[is.na(dd$Work)==F]
+
+table(work_without_NA)/length(work_without_NA) #relative frequencies table
+
+barplot(table(work_without_NA)/length(work_without_NA), col = c("lightgreen","lightblue","lightsalmon"),
+        las=2,cex.names=0.6,cex.axis = 0.6,
+        main="Employement status",ylab="Relative frequency")
+
+#Remember that Work is NOT an ordinal variable
+#since we cannot rank its modalities
+
+
+#Alternatively (more suitable for non-ordinal variables):
+
+pie(table(dd$Work), col = c("lightgreen","lightblue","lightsalmon"),cex=0.8)
+#...but pretty ugly
+
+#for 3D pie charts:
+#install.packages("plotrix") #if not installed yet
+# require(plotrix)
+# pie3D(table(dd$Work), labels = unlist(labels(table(dd$Work))),
+#       explode = 0.1, theta = pi/6, labelcex=0.8,
+#      col = c("lightgreen","lightblue","lightsalmon"))
+
+
+
+#Let's look at two qualitative variables jointly
+
+#Regular Marijuana consumption by Gender
+
+table(dd$RegularMarij,dd$Gender) #contingency table
+
+
+#Gender by marijuana consumers
+
+plot(Gender~RegularMarij,data=dd,col=c("lightblue","lightsalmon"))
+prop.table(table(dd$RegularMarij,dd$Gender),margin = 1)
+
+#marijuana consumption by Gender
+
+plot(RegularMarij~Gender,data=dd,col=c("lightgreen","lightyellow"))
+prop.table(table(dd$RegularMarij,dd$Gender),margin = 2)
+
+#Is there an association between the two variables?
+#qualitative variables ---> Chi-square test!
+
+X2_test=chisq.test(dd$RegularMarij, dd$Gender) 
+X2_test #we reject the hypothesis of independence between the two variables
+
+#...but what about the strength of the association?
+#Large samples often leads to rejection of the null hypothesis of the Chi-square test
+#So it can be useful to supplement the information provided by the p-value with
+#a normalized measure of the strength of the connection between the two variables:
+
+r=length(levels(dd$Gender)) #r=2 modalities
+c=length(levels(dd$RegularMarij)) #c=2 modalities
+num_ind=sum(table(dd$RegularMarij,dd$Gender)) #number of individuals considered (NA's automatically dropped)
+#N.B. min(r-1, c-1)=1
+
+sqrt(X2_test$statistic/(num_ind*min(r-1,c-1)))  #Cramer's V: low association
+
+
+# Selecting units who match a particular condition ------------- 
+
+
+#We want to look at the distribution of the levels of testosterone
+#which have been measured on our sample units
+
+require(ggplot2)
+ggplot(dd, aes(x=Testosterone))+
+  geom_histogram(fill="salmon",na.rm = T)
+
+#hist(dd$Testosterone,col="salmon") #the same
+
+#(?) How many modes (=peaks) do you observe? 2
+#    Any idea why?
+
+#Two modes. Probably due to different levels of testosterone between males and females
+
+
+#boxplots
+ggplot(dd, aes(x=Testosterone,fill=Gender))+
+  geom_boxplot(na.rm = T)+
+  facet_grid(~Gender)+
+  coord_flip() #switching from horizontal to vertical orientation
+
+
+#some summaries of Testosterone by Gender
+dd %>% 
+  group_by(Gender) %>% 
+  summarise(meanTest=mean(Testosterone,na.rm = T),
+            medTest=median(Testosterone,na.rm = T),
+            sdTest=sd(Testosterone,na.rm = T))
+
+
+#histograms
+ggplot(dd,aes(x=Testosterone,fill=Gender))+
+  geom_histogram(bins = 40,na.rm = T)+
+  facet_grid(~Gender)
+
+
+#There's still a mode close to 0
+
+#(?) Any idea why?
+#Very low levels of testosterone in younger people
+
+
+
+ggplot(dd %>% filter(Age>16),aes(x=Testosterone,fill=Gender))+
+  geom_histogram(bins = 40,na.rm = T)+
+  facet_grid(~Gender)
+
+#another brief example
+dd %>% 
+  filter(SmokeNow=="Yes" & Diabetes=="Yes") %>% 
+  View()
+
+# Transforming/creating variables and converting numeric to factor ----------------
+
+#We want to create a new variable which records
+#whether the unit usually sleeps enough by night
+#(we suppose that 'enough' is >6hrs per night)
+
+dd = 
+  dd %>% 
+  mutate(SleepEnough = ifelse(SleepHrsNight>6,"Yes","No"))
+
+str(dd$SleepEnough) #NB. SleepEnough is type 'character'
+
+# We convert it from 'character' to 'factor'
+# (--> each label associated with a different number)
+
+dd$SleepEnough = as.factor(dd$SleepEnough)
+str(dd$SleepEnough)
+
+
+#We want to identify three classes of people
+#according to their Body Mass Index
+#
+# <18.5           --------> Underweight
+# from 18.5 to 25 --------> Normal weight
+# >25             --------> Overweight
+
+#?cut
+BMI_cat = cut(x = dd$BMI,
+              breaks = c(min(dd$BMI),18.5,25,max(dd$BMI)),
+              labels = c("Underweight","Normal weight","Overweight"))
+
+str(BMI_cat)
+levels(BMI_cat)
+
+dd = 
+  dd %>% 
+  mutate(BMI_cat = BMI_cat)
+
+str(BMI_cat)
+table(dd$BMI_cat)
+
+
+#(?) What is the modal class?
+
+
+dd %>% 
+  pull(BMI_cat) %>% 
+  table() %>% 
+  which.max() %>% 
+  labels()
+
+labels(which.max(table(dd$BMI_cat))) #equivalent
+
+#(?) Which kind of graph would you use for BMI_cat?
+barplot(table(dd$BMI_cat),las=1,ylab="Frequency")
+
+
+
+##----------- LITTLE EXERCISE -----------------
+
+#(???) Now it's your turn........
+#
+#1) Build a suitable plot for the variable PhysActiveDays.
+#   What is the mode?
+
+barplot(table(dd$PhysActiveDays),ylab="Frequency",xlab="Num Days Phys Activity")
+
+dd %>% 
+  pull(PhysActiveDays) %>% 
+  table() %>% 
+  which.max() 
+
+
+#
+#2) Compute the mean and median for the variable SexNumPartnLife.
+#   Why these two measures are so different?
+#   Visualize the variable through a boxplot.
+
+mean(dd$SexNumPartnLife,na.rm = T)
+median(dd$SexNumPartnLife,na.rm = T) #more reliable against outliers
+
+boxplot(dd$SexNumPartnLife) #lots of outliers...
+barplot(table(dd$SexNumPartnLife))
+
+#We can discard all the records that we consider as 'outliers'
+#(a reasonable motivation should be provided, of course)
+
+dd %>%
+  filter(SexNumPartnLife<200) %>%
+  select(SexNumPartnLife) %>%
+  drop_na() %>%
+  boxplot()
+
+#
+#3) Build a suitable plot for the variable HomeRooms,
+#   by splitting the data in groups according to the MaritalStatus
+#
+
+table(dd$HomeRooms)
+levels(dd$MaritalStatus)
+
+boxplot(dd$HomeRooms~dd$MaritalStatus,las=1) #~ with alt+126
+
+
+
+#4) What is the percentage of female's smokers who does
+#   not sleep enough?
+
+dd %>% 
+  filter(Gender=="female" & SmokeNow=="Yes") %>% 
+  summarise(prop=mean(SleepEnough=="No",na.rm = T)) #about 45.6%
+
+
+# Dimensionality reduction (via PCA) ------------------
+
+#PCA aims at finding a low-dimensional representation of a data set that captures as much as possible of the variation (=information)
+#Our dataset of p variables lives in a p-dimensional space, but not all of these dimensions are equally interesting
+
+#Example from Chapter 10 of the book ISLR 
+
+?USArrests #we consider data on violent crime rates by US state
+data("USArrests") 
+rownames(USArrests) #units are US states
+colnames(USArrests) #variables
+
+#From the correlation matrix, it emerges a linear association between some of the variables (e.g. Assault and Murder) and a very weak linear association between some others (e.g. Murder and UrbanPop)
+
+cor(USArrests)
+pairs(USArrests)
+
+#Why is it important to scale the variables before performing PCA?
+
+apply(USArrests, 2, mean)
+colMeans(USArrests)  #alternative
+
+apply(USArrests, 2, var)
+
+
+#(?) What can you notice? The variable Assault has a much larger magnitude than the others: if we do not scale the variables, the first component will be completely driven by the variable assault, which has by far the largest mean and variance
+
+pca = princomp(USArrests, cor=T) #with cor=T calculations are made using correlation matrix (variables are implicitly scaled in this case)
+
+pca$loadings #matrix of variable loadings (the columns are the eigenvectors of the covariance/correlation matrix)
+
+#they show correlation between variables and principal components
+
+pca$sdev^2 #variance explained by each principal component
+pve=pca$sdev^2/sum(pca$sdev^2) #proportion of variance explained by each principal component
+
+plot(pve,xlab="PC",ylab="Proportion of variance explained",type="b",ylim=c(0,1)) 
+
+#let's look at the first two principal components
+biplot(pca, scale=0) #it represents graph of individuals and graph of variables on the same plot
+
+#Crime-related variables (Rape, Assault, Murder) are close to each other and have approximately equal weight on the first component, while UrbanPop is far from the other three and it has a high weight on the second component
+
+#PC1: roughly corresponds to a overall rates of serious crimes
+#PC2: roughly corresponds to level of rurality of the state
+
+#For example, California, Nevada and Florida have large positive scores on the first component (-> high crime rates), while North Dakota and Vermont have large neagtive scores on the first component (-> small crime rates)
+
+#For the second component, for example, New Jersey and California as low levels of rurality, while North Carolina and Mississippi high levels
+
+#States like Virginia and Oklahoma are closed to zero on both components: average levels of both crime and urbanization
+
+

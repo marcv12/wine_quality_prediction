@@ -1,0 +1,1 @@
+"0","boxplot(df_train$Months_Inactive_12_mon, main=""Months inactive"")"

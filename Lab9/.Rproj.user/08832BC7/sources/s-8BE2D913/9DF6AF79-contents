@@ -1,0 +1,374 @@
+
+# Let us consider the following data about a Portuguese Marketing campaign
+# Such campaign was based on phone calls.
+# The datasets "subscriptionsTrain.csv" and "subscriptionsTest.csv" provide information about the different clients that have been contacted in the past. In particular, for all the listed clients we know wether they did or did not subscribe the contract.
+# NOTE: more than one call was necessary in many cases
+
+# The final objective of the analysis is to use the records in "subscriptionsTrain.csv" to recognize a pattern between the available information/covariates and the outcome of interest, i.e. the final subscription of the contract.
+# If we build a model able to exploit such pattern, we can suggest the bank the list of potential client that are more likely to subscribe a contract.
+# We can verify the reliability of our model by testing its performance on the "subscriptionsTest.csv" data, that have not been used in the training phase.
+
+
+# Packages -------------------------------------------------------------------
+require(tidyverse)
+#require(magrittr)
+
+require(class)
+# require(caret)
+require(pROC)
+
+require(GGally)
+
+
+
+# Data loading --------------------------------------------------------------------
+
+
+#d_train <- read_csv("subscriptionsTrain.csv", )
+d_train <- read_delim("Data/subscriptionsTrain.csv", delim=";")
+d_val <- read_delim("Data/subscriptionsTest.csv", delim=";") # Here we use the test set as validation set: you'll understand the difference later on
+
+# Let's give a first look at the data
+d_train %>% glimpse # Train
+d_val %>% glimpse  # Test
+
+
+# Variables.
+
+#age (numeric)
+#marital : marital status (categorical: "married","divorced","single"; note: "divorced" means divorced or widowed)
+#education : (categorical: "primary","secondary","tertiary")
+#default : has credit in default? (binary: "yes","no")
+#balance : average yearly balance, in euros (numeric)
+#housing : has housing loan? (binary: "yes","no")
+#loan : has personal loan? (binary: "yes","no")
+#duration : last contact duration, in seconds (numeric)
+#campaign : number of contacts performed during this campaign and for this client (numeric, includes last contact)
+#previous : number of contacts performed before this campaign and for this client (numeric)
+#poutcome : outcome of the previous marketing campaign (binary: "failure","success")
+
+#y : has the client subscribed a term deposit? (binary: "yes","no")
+
+
+# Some Exploratory Data Analysis ------------------------------------------
+
+# Let us compute some summary measures
+summary(d_train)      # The summary on some variables is not great... 
+str(d_train)          # R has recognized all strings as characters
+
+#  It is more convenient to read them as factors.
+d_train <- d_train %>% mutate(across(where(is.character), as.factor))
+d_val <- d_val %>% mutate(across(where(is.character), as.factor))
+
+# Let's look at the data now
+str(d_train) 
+summary(d_train)
+
+# The summary() function gives you an idea of
+# 1. The distribution of numerical variables: do we need to clean outliers
+# 2. The frequency distribution of categorical variables: are there any with too few observations? Maybe we can group some of them
+# 3. The presence of NA values: for numerical you can impute them, for categorical you can treat them as an additional category (if there are enough)
+# Otherwise, if they are not many, you can omit the NA's with na.omit
+d_train %>% na.omit()
+
+# Check for duplicates.
+# You can either select one of the two or build a combination of the duplicates: mean, median, etc.
+any(duplicated(d_train))
+# This dataset lacks a unique unit identifier, so duplicates are not necessarily errors
+# In this case, if any was present, we could keep it
+
+# Let's get a graphical representation
+# The command ggpairs is a bit slow, but works great: provides different plots according to the variable type
+# We subselect only some of the variables.
+# You can make it look better playing with some of the arguments
+d_train %>% select(loan:y) %>% ggpairs()
+
+# If we want to have a focus on numeric variables, we can give a look at the correlation
+d_train %>% select(where(is.numeric)) %>% cor() %>% 
+  corrplot::corrplot()
+d_train %>% select(where(is.numeric)) %>% ggcorr()
+  
+# Logistic regression - 1 -----------------------------------------------------
+
+# Let us fit a first logistic regression with two covariates: one continuous and one categorical
+logit.fit <- glm(y~duration+default, family = "binomial", data = d_train)
+summary(logit.fit)
+
+# Coefficients interpretation. Marginal effects are not as straightforward as in the linear regression.
+# Everything must be interpreted in terms of odds-ratios
+logit.fit$coefficients     
+# Signs tell us about the direction of the effect
+# The intensity cannot be directly interpreted
+
+# The intercept
+logit.fit$coefficients[1]
+exp(logit.fit$coefficients[1])/(1+exp(logit.fit$coefficients[1]))
+# The reference individual (contact with 0 duration and no default) has 11% (approx) probability to subscribe the contract
+# It becomes more interpretable if the numerical variables are centered around the mean: the reference individual becomes the one with average contact time
+
+# The numerical variable
+logit.fit$coefficients[2]
+exp(logit.fit$coefficients[2]) 
+# A unit increase in the variable implies a multiplication of the odds ratio by 1.0035 (it is the 0.35% larger than the previous one)
+
+# The categorical variable
+logit.fit$coefficients[3]
+exp(logit.fit$coefficients[3]) 
+# When the category is matched (default=yes), the odds ratio is multiplied by 0.11 (it is the 11% of the previous one - 89% smaller than the previous one) 
+
+# To grasp better the meaning of the estimated coefficients, let's look at some plots
+
+# Let us plot the estimated probability to subscribe the bank deposit at varying contact duration
+# Differently from the previous lesson, we now have two different curves:
+# 1. One for those with credit in default
+# 2. One for those with credit not in default
+
+# We exploit the predict function to draw the lines, and use ggplot to draw the lines
+# In order to do so, we must build a dataframe/tibble with the covariates grid on which we want to predict
+xFake <- expand.grid(duration=seq(min(d_train$duration), max(d_train$duration), length=1000), 
+                     default=as.factor(c("yes", "no"))) %>% as_tibble
+# Then we compute the predictions on this grid
+logitPred <-  predict(logit.fit, newdata = xFake)  # Predictions on the link scale
+logitResp <-  predict(logit.fit, newdata = xFake, type = "response")  # Predictions on the response scale (probability)
+
+# We can move from the link scale to the response scale through the inv-logit function
+all(plogis(logitPred)==logitResp)  # They are not all equal
+sum(plogis(logitPred)!=logitResp)  # There are 900 that are different
+sum(abs(plogis(logitPred)-logitResp))  # The difference is negligible: just numerical
+
+# Less interesting
+xFake %>% bind_cols(pred=logitPred) %>% 
+  ggplot() + geom_line(aes(x=duration, y=pred, col=default), size=1) + 
+  theme_bw()
+# More interesting
+xFake %>% bind_cols(prob=logitResp) %>% 
+  ggplot() + geom_line(aes(x=duration, y=prob, col=default), size=1) + 
+  geom_point(aes(x=duration, y=jitter(as.numeric(y)-1, .2)), data=d_train, 
+             alpha=.2, shape=20) + 
+  theme_bw()
+
+
+# We see how the coefficient effect varies with varying duration: the ratio changes
+xFake %>% bind_cols(prob=logitResp) %>% spread(default, prob) %>% 
+  mutate(yes/no)
+
+# The effect is instead interpreable on the odds scale: ratio is constant
+xFake %>% bind_cols(prob=logitResp) %>% 
+  mutate(odds=prob/(1-prob)) %>% select(-prob) %>% 
+  spread(default, odds) %>% mutate(yes/no)
+xFake %>% bind_cols(prob=logitResp) %>% 
+  ggplot() + geom_line(aes(x=duration, y=prob/(1-prob), col=default), size=1) + 
+  theme_bw()
+
+
+# Centering duration
+d_train <- d_train %>% mutate(duration=duration-mean(duration))
+logit.fit <- glm(y~duration+default, family = "binomial", data = d_train)
+
+# The value of the intercept changes
+# Intercept
+exp(logit.fit$coefficients[1])/(1+exp(logit.fit$coefficients[1]))
+
+# Not that of the coefficients
+# Coefficients
+exp(logit.fit$coefficients[2:3])
+# But the curve has changed!
+logitResp <-  predict(logit.fit, newdata = xFake, type = "response")
+xFake %>% bind_cols(prob=logitResp) %>% 
+  ggplot() + geom_line(aes(x=duration, y=prob, col=default), size=1) + 
+  geom_point(aes(x=duration, y=jitter(as.numeric(y)-1, .2)), data=d_train, 
+             alpha=.2, shape=20) + 
+  theme_bw()
+
+# Prediction
+new.pred <- tibble(duration = c(1200, 1200), default=c("yes", "no"))
+# Su scala prob
+new.prob <- predict(logit.fit, newdata = new.pred, type = "response")
+new.prob
+
+# More interesting
+xFake %>% bind_cols(prob=logitResp) %>% 
+  ggplot() + geom_line(aes(x=duration, y=prob, col=default), size=1) + 
+  geom_point(aes(x=duration, y=prob), data=new.pred %>% bind_cols(prob=new.prob))+ 
+  geom_path(aes(x=duration, y=prob), data=new.pred %>% bind_cols(prob=new.prob))+ 
+  geom_text(aes(x=duration, y=prob, label=round(prob, 3)), data=new.pred %>% 
+              bind_cols(prob=new.prob),
+            nudge_x=-200) + 
+  theme_bw()
+# A personwhose last contact lasted 20 mins (i.e. 1200 seconds) has an estimated probability to subscribe the deposit of:
+# 89.6% if he is not in default
+# 49.1% if he is in default
+
+
+# Logistic regression - 2 -----------------------------------------------
+
+# Let us try to make a true analysis.
+# We shall suggest the bank which client to call or not, and we want to do it with the best logistic model possible
+
+# Let's try with a logistic model with all variables
+logit.fit1 <- glm(y~., family = "binomial", data = d_train)
+summary(logit.fit1)
+
+# Estimated log-odds
+head(logit.fit1$linear.predictors) 
+head(predict(logit.fit1))
+
+# Estimated probabilities
+head(logit.fit1$fitted.values)   
+head(predict(logit.fit1,type = "response"))   
+
+# Can we improve on the full model?
+# We can exclude/include variables in a step-wise fashion
+# We accept the move (exclusion/inclusion of a variable) if the AIC/BIC improves
+
+# Stepwise based on AIC
+logit.AICStep <- step(logit.fit1, direction = "both")
+summary(logit.AICStep)
+
+# Stepwise based on BIC
+logit.BICStep <- step(logit.fit1, direction = "both", k=log(nrow(d_train)))
+summary(logit.BICStep)
+
+# The two output are different: the BIC selects a different model thant the AIC
+# This was expected: the BIC is more severe and favors simpler models
+
+# How can we compare the best AIC and BIC selections?
+# AIC and BIC are not directly comparable. We need some other metric
+
+# Classification metrics: based on a threshold
+thresh <- 0.5
+# We must transform the estimated probabilities in labels
+stepAicPreds <- ifelse(logit.AICStep$fitted.values>0.5, "yes", "no") %>% 
+  as.factor()
+stepBicPreds <- ifelse(logit.BICStep$fitted.values>0.5, "yes", "no") %>% 
+  as.factor()
+
+# ON THE TRAINING SET
+# Confusion matrices
+table(stepAicPreds, d_train$y)
+table(stepBicPreds, d_train$y)
+
+# Accuracy
+(AccAIC <- mean(stepAicPreds==d_train$y))
+(MiscAIC <- 1-AccAIC) # Misclassification error
+(AccBIC <- mean(stepBicPreds==d_train$y))
+(MiscBIC <- 1-AccBIC) # Misclassification error
+
+
+# ON THE TESTING SET
+
+stepAicPredsOut <- ifelse(predict(logit.AICStep, newdata=d_val, 
+                              type = "response")>0.5, "yes", "no") %>% 
+  as.factor()
+stepBicPredsOut <- ifelse(predict(logit.BICStep, newdata=d_val, 
+                              type = "response")>0.5, "yes", "no") %>% 
+  as.factor()
+
+# Confusion matrix
+table(stepAicPredsOut, d_val$y)
+table(stepBicPredsOut, d_val$y)
+
+# Accuracy
+(AccAICOut <- mean(stepAicPredsOut==d_val$y))
+(MiscAICOut <- 1-AccAICOut)
+(AccBICOut <- mean(BicPredsOut==d_val$y))
+(MiscBICOut <- 1-AccBICOut)
+
+# We can derive many other metrics from the confusion matrix.
+# Try some others: sensitivity, specificity, etc...
+
+
+# Keep in mind: changing the thresholds changes the results. If we really care about the final classification, the threshold may be tuned to find the best one for our final purposes (we care more about the 0s, more about the 1s, or equally about the two).
+
+
+# ROC and AUC -------------------------------------------------------------
+
+
+# ROC curve (receiver operating characteristics) and AUC (Area Under the Curve)
+# Evaluate the estimated probabilities (for all possible thresholds)
+# It is a very comprehensive measure of the performance of a methods in estimating the probabilities (which is more than just classifying)
+
+# On the train set
+ROCAic <- roc(d_train$y, logit.AICStep$fitted.values, plot = TRUE,
+              legacy.axes=TRUE, col="midnightblue", lwd=3,
+              auc.polygon=T, auc.polygon.col="lightblue", print.auc=T)
+ROCBic <- roc(d_train$y, logit.BICStep$fitted.values, plot = TRUE,
+              legacy.axes=TRUE, col="midnightblue", lwd=3,
+              auc.polygon=T, auc.polygon.col="lightblue", print.auc=T)
+
+# From the ROC curve we can derive sensitivity and specificity at different thresholds
+# EXAMPLE
+# Let's select a threshold close to 0.6
+idx <- which.min(abs(ROCAic$thresholds-0.5)) 
+# Extract sensitivity and specificity
+ROCAic$sensitivities[idx] 
+ROCAic$specificities[idx] 
+# Compare these two with those you can got from the confusion matrix we computed before (with threhsold 0.5)
+# You will see they are identical (or very close)
+
+# The AUC can be extracted in this way: the closer it is to 1 and the better it is
+ROCAic$auc
+ROCBic$auc
+# On the train set the AIC step selection provides the best model: makes sense, it has more predictors
+
+
+# What about the test
+ROCAicOut <- roc(d_val$y, predict(logit.AICStep, newdata=d_val, 
+                                  type = "response"), plot = TRUE,
+                 legacy.axes=TRUE, col="midnightblue", lwd=3,
+                 auc.polygon=T, auc.polygon.col="lightblue", print.auc=T)
+ROCBicOut <- roc(d_val$y, predict(logit.BICStep, newdata=d_val, 
+                                  type = "response"), plot = TRUE,
+                 legacy.axes=TRUE, col="midnightblue", lwd=3,
+                 auc.polygon=T, auc.polygon.col="lightblue", print.auc=T)
+
+ROCAicOut$auc
+ROCBicOut$auc
+# On the test set the AIC step selection still provides the best model.
+
+# According to the AUC, the AIC step based selection seems to provide the best performances on this data
+
+
+
+# An alternative (and more practical) approach: the cost matrix -----------
+
+
+# Cost matrix: in real life, every decision leads to a cost (gain), and we want to minimize (maximize) it
+
+# Let's suppose that
+# New contract subscribed = -100 (corresponds to a 100 gain)
+# Making a call = 20 (corresponds to a -20 gain)
+(costMat <- matrix(c(0, 20, 0, -80), ncol=2, 
+                   dimnames = list(c("No", "Yes"), c("No", "Yes"))))
+# If we call and close the contract we gain 100 and pay 20, sowe get 80
+# If we call and do not close the contract, we just pay 20
+# If we do not call we have no gain and no cost
+
+# To understand the overall performances in terms of the cost matrix, we must pick a threshold, compute the confusion matrix, and match it with cost matrix
+# Keeping the same threshold of before (i.e. 0.5), what is the final cost?
+# On the train
+confMatAic <- table(stepAicPreds, d_train$y)
+(totcostAic <- sum(costMat*confMatAic))
+confMatBic <- table(stepBicPreds, d_train$y)
+(totcostBic <- sum(costMat*confMatBic))
+# AIC has lower cost = larger gain
+
+# Sul test
+confMatAicOut <- table(stepAicPredsOut, d_val$y)
+(totcostAicOut <- sum(costMat*confMatAicOut))
+confMatBicOut <- table(stepBicPredsOut, d_val$y)
+(totcostBicOut <- sum(costMat*confMatBicOut))
+# AIC has lower cost = larger gain
+
+
+# What happens if we change the thresholds?
+# Try different thresholds and find the ones that gives the final best outcome (lowest cost = largest gain)
+
+
+# What comes next? --------------------------------------------------------
+
+
+# KNN, LDA and QDA: next time
+
+# Hold-Out validation is not the best way to validate a model: it is not really robust
+# In a few lessons you will learn about the cross-validation, which is a way more robust way to evaluate a model!

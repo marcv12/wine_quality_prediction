@@ -1,0 +1,20 @@
+#garbage from class
+# customized function to evaluate model performance for binary predictors
+myeval = function(prob, actual) {
+  # get treshold with optimal accuracy
+  seps = seq(0.01, 0.99, by=0.01)
+  accuracy = c()
+  for (sep in seps){
+    class = as.factor(ifelse(prob >= sep, 1, 0))
+    cm = confusionMatrix(class, actual, positive = "1")
+    accuracy = c(accuracy, cm$overall[["Accuracy"]])
+  }
+  opt.sep = seps[which.max(accuracy)]
+  print(opt.sep)
+  # make predictions based on best accuracy
+  pred = as.factor(ifelse(prob >= opt.sep, 1, 0))
+  confM = confusionMatrix(pred, actual, positive = "1")
+  return(confusionMatrix = confM)
+  
+  
+} 

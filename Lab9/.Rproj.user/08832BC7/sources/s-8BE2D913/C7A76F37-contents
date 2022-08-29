@@ -1,0 +1,307 @@
+
+# Packages ----------------------------------------------------------------
+
+require(tidyverse)
+require(magrittr)
+require(ISLR)
+require(glmnet)
+
+# Data --------------------------------------------------------------------
+
+dat <- MASS::Boston %>% as_tibble()
+?MASS::Boston
+
+# Let's "glimpse" the data
+dat %>% glimpse
+# The crime-rate cannot be Gaussian (support > 0)
+dat %>% ggplot() + geom_density(aes(x=crim)) + theme_bw()
+# Log crime rate looks better
+dat %>% ggplot() + geom_density(aes(x=log(crim))) + theme_bw()
+
+# dat %<>% mutate(lcrim=log(crim)) %>% dplyr::select(-crim)
+dat <- dat %>% mutate(lcrim=log(crim)) %>% 
+  dplyr::select(-crim)
+
+# Organizing data ---------------------------------------------------------
+
+?glmnet
+
+n <- nrow(dat)
+X <- model.matrix(lcrim~.-1, data = dat)
+Y <- dat$lcrim
+
+# Split train-test: Test set is not the validation set!
+set.seed(130494)
+ntr <- round(n*0.7)
+nte <- n-ntr
+trIdx <- sample(1:n, size=ntr)
+
+Xtr <- X[trIdx,]
+Ytr <- Y[trIdx]
+Xte <- X[-trIdx,]
+Yte <- Y[-trIdx]
+
+# Scale the numerical covariates only
+XtrNum <- Xtr[, -3]  # Deselect the dummy variable chas
+XteNum <- Xte[, -3]
+XtrNumS <- XtrNum %>% scale()   # Standardize
+XteNumS <- XteNum %>% scale(., center=attr(XtrNumS, "scaled:center"),
+                                scale=attr(XtrNumS, "scaled:scale"))
+
+XtrS <- cbind(chas=Xtr[,3], XtrNumS)  # Re-append the dummy variable chas
+XteS <- cbind(chas=Xte[,3], XteNumS)
+# rbind()
+
+# bind_cols()
+# bind_rows()
+
+# Lasso --------------------------------------------------------------
+
+# Standard fit using glmnet
+lasso.fit <- glmnet(XtrS, Ytr, alpha=1)
+# We get one vector of coefficient for each value of lambda.
+# glmnet is smart enough to pick a good sequence of lambda by itself.
+# You can provide one using the "lambda=.." argument
+lasso.fit$beta
+lasso.fit$lambda
+
+# Plot coefficient values against L1-Norm
+plot(lasso.fit, label=T)
+plot(lasso.fit, label=T, xvar = "lambda")
+
+# Last lambda
+lasso.fit$lambda[length(lasso.fit$lambda)]
+lasso.fit$beta[,length(lasso.fit$lambda)]
+sum(abs(lasso.fit$beta[,length(lasso.fit$lambda)]))# L1 norm
+sqrt(sum(lasso.fit$beta[,length(lasso.fit$lambda)]^2))# L2 norm
+
+# First lambda
+lasso.fit$lambda[1]
+lasso.fit$beta[,1]
+sum(abs(lasso.fit$beta[,1]))# L1 norm
+sqrt(sum(lasso.fit$beta[,1]^2)) # L2 norm
+
+# 20th lambda
+lasso.fit$lambda[20]
+lasso.fit$beta[,20]
+sum(abs(lasso.fit$beta[,20])) # L1 norm
+sqrt(sum(lasso.fit$beta[,20]^2)) # L2 norm
+
+# Build plot VS l2-norm (may be useful if we wanted to fit the RIDGE)
+l2Betas <- apply(lasso.fit$beta, 2, function(x) sqrt(sum(x^2)))
+matplot(l2Betas, t(lasso.fit$beta), type="l")
+
+# With xvar we can decide to get the plot against the log(lambdas)
+plot(lasso.fit, label=T, xvar = "lambda")
+log(lasso.fit$lambda)
+
+# Predict on the test (one column for each lambda)
+predict(lasso.fit, Xte)
+# Predict for lambda=1
+predict(lasso.fit, Xte, s=1)
+
+# How do we pick the best lambda? Cross-validation!
+# Let's do one by hand, from scratch!
+# We will provide our own sequence of lambda (not really necessary, but we guarantee that all folds will have the same sequence)
+nlambdas <- 100
+lambdas <- seq(0.001, 2, length.out = nlambdas)
+nfolds <- 5
+
+# Creating folds: long road, all folds same size (+-1)
+shuffled <- sample(1:ntr, size = ntr)
+foldsBounds <- c(0, round(ntr/nfolds*(1:nfolds)))
+foldid <- rep(NA, ntr)
+for (k in 1:nfolds)
+{ 
+  idxs <- shuffled[((foldsBounds[k]+1):foldsBounds[k+1])]
+  foldid[idxs] <- k
+}
+table(foldid)
+
+# Creating folds: short road, all folds asymptotically of the same size
+foldid <- sample(1:nfolds, size = ntr, replace = TRUE)
+table(foldid)
+
+# Creating folds: caret command
+foldid <- caret::createFolds(Ytr, k = nfolds, list = F)
+table(foldid)
+
+# Matrix where we will save the CV scores: folds on the rows, lambdas on the cols
+cvScores <- matrix(NA, nrow=nfolds, ncol=nlambdas)
+
+for (k in 1:nfolds)
+{
+  foldOut <-foldid==k
+  
+  oo <- glmnet(Xtr[-foldOut,], Ytr[-foldOut], alpha=1, lambda=lambdas)
+  
+  cvScores[k,] <- colMeans((predict(oo, Xtr[foldOut,], s = lambdas)-Ytr[foldOut])^2)
+}
+
+# Plotting the cvScores of each fold against lambdas
+matplot(x=lambdas, y=t(cvScores), type="l", lty=1,
+        ylab="Error", xlab=expression(lambda))
+legend("topleft", paste("fold", 1:nfolds), col=1:nfolds, lty=1, bty="n")
+matplot(x=log(lambdas), y=t(cvScores), type="l", lty=1,
+        ylab="Error", xlab=expression(log(lambda)))
+legend("topleft", paste("fold", 1:nfolds), col=1:nfolds, lty=1, bty="n")
+
+# Averaging over folds
+plot(x=lambdas, y=colMeans(cvScores),
+     ylab="Error", xlab=expression(lambda))
+plot(x=log(lambdas), y=colMeans(cvScores),
+     ylab="Error", xlab=expression(log(lambda)))
+(lambdaStar <- lambdas[which.min(colMeans(cvScores))])
+
+# Automatic CV
+Lasso.cv <- cv.glmnet(XtrS, Ytr, lambda=lambdas, alpha=1,
+                      family="gaussian")
+
+plot(Lasso.cv$lambda, Lasso.cv$cvm,
+     ylab="Error", xlab=expression(lambda))
+plot(log(Lasso.cv$lambda), Lasso.cv$cvm,
+     ylab="Error", xlab=expression(log(lambda)))# Plot from scratch
+plot(Lasso.cv) # Automatic plot
+
+Lasso.cv$lambda.min
+Lasso.cv$lambda.1se
+
+# Try and add the confidence bounds also to the plot from scratch
+
+(lambdaStar <- Lasso.cv$lambda.1se) # Real best lambda: 1se from the minumum
+# Get values for the chosen lambda
+coef(Lasso.cv, s=lambdaStar)
+# These are the predictions I would use on the test set!
+predict(Lasso.cv, Xte, s=lambdaStar)
+
+
+# Ridge -------------------------------------------------------------------
+
+# Identical to the LASSO, but with alpha=0. Remember, here the L2-Norm matters, and we don't get it automatically!
+# Try and reproduce it by yourself
+
+# sqrt(sum(lasso.fit$beta[,1]^2)) # L2 norm
+# Build plot VS l2-norm (may be useful if we wanted to fit the RIDGE)
+# l2Betas <- apply(lasso.fit$beta, 2, function(x) sqrt(sum(x^2)))
+# matplot(l2Betas, t(lasso.fit$beta), type="l")
+
+
+# Elastic net -------------------------------------------------------------
+
+# It is obtained for 0<alpha<1
+set.seed(130494)
+
+# There is no automatic way to cross-validate alpha. We must implement it from scratch.
+# We take advantage of cv.glmnet to get cv-scores for all lambdas, fixed one alpha
+nalphas <- 20
+alphas <- seq(0, 1, length.out=nalphas)
+# We must fix the foldids in order to have comparable results for different alphas
+foldid <- sample(1:nfolds, size = ntr, replace = TRUE)
+
+# In this list, we are saving all the cv.glmnet output for all alphas
+cvs <- list()
+for (a in 1:nalphas)
+{
+  cvs[[a]] <- cv.glmnet(XtrS, Ytr, foldid = foldid, alpha = alphas[a], 
+                        lambda=lambdas)
+}
+
+# Plot the first 3 alphas behavior
+alphaNames <- paste("alpha=", round(alphas[1:3], 4))
+par(mar=c(3, 3, 3, 3))
+layout(matrix(c(1,2,3,4), nrow=2))
+plot(cvs[[1]], main=alphaNames[1]) 
+plot(cvs[[2]], main=alphaNames[2])
+plot(cvs[[3]], main=alphaNames[3])
+plot(log(cvs[[1]]$lambda)   , cvs[[1]]$cvm , pch = 19, col = 1,
+      xlab = "log(Lambda)", ylab = cvs[[1]]$name)
+ points(log(cvs[[2]]$lambda), cvs[[2]]$cvm, pch = 19, col = 2)
+points(log(cvs[[3]]$lambda) , cvs[[3]]$cvm , pch = 19, col = 3)
+legend("topleft", legend = alphaNames,
+        pch = 19, col = 1:3, bty="n")
+dev.off()
+
+# Get the cvscores for all cv.glmnet
+cvScores <- sapply(cvs, function(x) x$cvm)
+# Plot all the cv scores, for all lambda, at all alphas (different lines)
+matplot(log(cvs[[1]]$lambda), cvScores, type="l")
+
+# Get the best lambda position, for all alphas
+bestLambda <- apply(cvScores, 2, which.min)
+# Get the best score of the best lambda, for all alphas
+bestcvScores <- apply(cvScores, 2, min)
+# Get the best alpha position among the scores of the best lambdas
+bestAlpha <- which.min(bestcvScores)
+
+(alphaStar <- alphas[bestAlpha])
+(lambdaStar <- cvs[[1]]$lambda[bestLambda[bestAlpha]])
+
+# Otherwise, we can exploit caret
+require(caret)
+?trainControl
+ctrl <- trainControl(method="cv", number=nfolds)
+Lasso.caret <- train(XtrS, Ytr, method = "glmnet", trControl = ctrl,
+                             tuneGrid = expand.grid(alpha = alphas, 
+                                                    lambda = lambdas))
+Lasso.caret$bestTune
+
+
+# Binomial ----------------------------------------------------------------
+
+# Let's see the density again
+dat %>% ggplot() + geom_density(aes(x=lcrim)) + theme_bw()
+# It looks like we have two peaks. Let's split these categorizing.
+
+lcrimDens <- density(dat$lcrim)
+ymiddlemin <- min(lcrimDens$y[lcrimDens$x>-2.5 & lcrimDens$x<2.5])
+xmiddlemin <- lcrimDens$x[lcrimDens$y==ymiddlemin]
+dat %>% ggplot() + geom_density(aes(x=lcrim)) + 
+  geom_vline(xintercept = xmiddlemin, col="blue") +
+  theme_bw()
+
+# Let us binaryze lcrim
+dat %<>% mutate(catcrim=as.factor(ifelse(lcrim<xmiddlemin, 0, 1))) %>% dplyr::select(-lcrim)
+
+glimpse(dat)
+
+
+# glmnet on binary --------------------------------------------------------
+
+Y <- dat$catcrim
+
+Ytr <- Y[trIdx]
+Yte <- Y[-trIdx]
+
+# Lasso
+Lasso.cv <- cv.glmnet(XtrS, Ytr, alpha=1, 
+                      family="binomial")
+
+plot(Lasso.cv$lambda, Lasso.cv$cvm)
+plot(log(Lasso.cv$lambda), Lasso.cv$cvm)
+plot(Lasso.cv)
+
+# Ridge
+Ridge.cv <- cv.glmnet(XtrS, Ytr, alpha=0, 
+                      family="binomial")
+plot(Ridge.cv)
+Ridge.cv$lambda
+
+Ridge.cv <- cv.glmnet(XtrS, Ytr, lambdas=seq(0, 500, 
+                                            length.out=1000), alpha=0, 
+                      family="binomial")
+plot(Ridge.cv)
+
+# What if we want to use the AUC?
+Lasso.cv2 <- cv.glmnet(XtrS, Ytr, alpha=1, 
+                       family="binomial", type.measure = "auc")
+plot(Lasso.cv2)
+
+Ridge.cv2 <- cv.glmnet(XtrS, Ytr, alpha=0, 
+                      family="binomial", type.measure = "auc")
+plot(Ridge.cv2)
+
+
+# Try to:
+#   - Specify your own sequence of lambdas so that the last bad AUC score disappear
+#   - Cross-validate alpha and lambda together in order to implement elastic net
+

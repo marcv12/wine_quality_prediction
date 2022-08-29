@@ -1,0 +1,1 @@
+"0","bet0_bet1 <- exp(fit$coefficients[2]+fit$coefficients[1])"

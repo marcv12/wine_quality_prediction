@@ -1,0 +1,582 @@
+"0","for (i in 1:length(kList))"
+"0","{"
+"0","  # Arguments: training set, new data to predict upon, labels on the training set, k"
+"0","  oo_In <- knn(X_trainScaled, X_trainScaled, Y_train, k = kList[i], prob=T)"
+"0","  oo_Out <- knn(X_trainScaled, X_valScaled, Y_train, k = kList[i], prob=T)"
+"0","  "
+"0","  miscKNN_In[i] <- 1-mean(Y_train==oo_In)"
+"0","  miscKNN_Out[i] <- 1-mean(Y_val==oo_Out)"
+"0","  "
+"0","  # The probability is an attribute that gives the probability of the winning class"
+"0","  probyes_In <- ifelse(oo_In==""yes"", attr(oo_In, ""prob""), "
+"0","                       1-attr(oo_In, ""prob""))"
+"0","  probyes_Out <- ifelse(oo_Out==""yes"", attr(oo_Out, ""prob""), "
+"0","                        1-attr(oo_Out, ""prob""))"
+"0","  "
+"0","  aucKNN_In[i] <- pROC::auc(Y_train==""yes"", probyes_In)"
+"0","  aucKNN_Out[i] <- pROC::auc(Y_val==""yes"", probyes_Out)"
+"0","}"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"2","Setting levels: control = FALSE, case = TRUE
+"
+"2","Setting direction: controls < cases
+"
+"0","# Plot the performances in MISCK"
+"0",""
+"0","plot(kList, miscKNN_In, type=""b"", lwd=2, ylim=c(0, .3), main=""MISC train VS test"","
+"0","     ylab=""MISC"")"

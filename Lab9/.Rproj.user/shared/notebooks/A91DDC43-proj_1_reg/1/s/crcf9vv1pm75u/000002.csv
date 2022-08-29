@@ -1,0 +1,221 @@
+"0","library(caret)"
+"2","Warning:"
+"2"," package ‘caret’ was built under R version 4.1.3
+"
+"2","Loading required package: ggplot2
+"
+"2","Loading required package: lattice
+"
+"0","library(dplyr)"
+"2","
+Attaching package: ‘dplyr’
+
+"
+"2","The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+"
+"2","The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+"
+"0","library(GGally)"
+"2","Warning:"
+"2"," package ‘GGally’ was built under R version 4.1.3
+"
+"2","Registered S3 method overwritten by 'GGally':
+  method from   
+  +.gg   ggplot2
+"
+"0","library(ggplot2)"
+"0","library(tidyverse)"
+"2","Warning:"
+"2"," package ‘tidyverse’ was built under R version 4.1.3
+"
+"2","Registered S3 methods overwritten by 'dbplyr':
+  method         from
+  print.tbl_lazy     
+  print.tbl_sql      
+"
+"2","[30m-- [1mAttaching packages[22m ------------ tidyverse 1.3.1 --[39m
+"
+"2","[30m[32mv[30m [34mtibble [30m 3.1.6     [32mv[30m [34mpurrr  [30m 0.3.4
+[32mv[30m [34mtidyr  [30m 1.2.0     [32mv[30m [34mstringr[30m 1.4.0
+[32mv[30m [34mreadr  [30m 2.1.2     [32mv[30m [34mforcats[30m 0.5.1[39m
+"
+"2","[30m-- [1mConflicts[22m --------------- tidyverse_conflicts() --
+[31mx[30m [34mdplyr[30m::[32mfilter()[30m masks [34mstats[30m::filter()
+[31mx[30m [34mdplyr[30m::[32mlag()[30m    masks [34mstats[30m::lag()
+[31mx[30m [34mpurrr[30m::[32mlift()[30m   masks [34mcaret[30m::lift()[39m
+"
+"0","library(corrplot)"
+"2","Warning:"
+"2"," package ‘corrplot’ was built under R version 4.1.3
+"
+"2","corrplot 0.92 loaded
+"
+"0","library(gridExtra)"
+"2","Warning:"
+"2"," package ‘gridExtra’ was built under R version 4.1.3
+"
+"2","
+Attaching package: ‘gridExtra’
+
+"
+"2","The following object is masked from ‘package:dplyr’:
+
+    combine
+
+"
+"0","library(ggpubr)"
+"2","Warning:"
+"2"," package ‘ggpubr’ was built under R version 4.1.3
+"
+"0","library(moments)"
+"0","library(rpart)"
+"2","Warning:"
+"2"," package ‘rpart’ was built under R version 4.1.3
+"
+"0","library(rpart.plot)"
+"2","Warning:"
+"2"," package ‘rpart.plot’ was built under R version 4.1.3
+"
+"0","library(pROC)"
+"2","Warning:"
+"2"," package ‘pROC’ was built under R version 4.1.3
+"
+"2","Type 'citation(""pROC"")' for a citation.
+"
+"2","
+Attaching package: ‘pROC’
+
+"
+"2","The following objects are masked from ‘package:stats’:
+
+    cov, smooth, var
+
+"
+"0","library(AUC)"
+"2","Warning:"
+"2"," package ‘AUC’ was built under R version 4.1.3
+"
+"2","AUC 0.3.2
+"
+"2","Type AUCNews() to see the change log and ?AUC to get an overview.
+"
+"2","
+Attaching package: ‘AUC’
+
+"
+"2","The following objects are masked from ‘package:pROC’:
+
+    auc, roc
+
+"
+"2","The following objects are masked from ‘package:caret’:
+
+    sensitivity, specificity
+
+"
+"0","library(glmnet)"
+"2","Warning:"
+"2"," package ‘glmnet’ was built under R version 4.1.3
+"
+"2","Loading required package: Matrix
+"
+"2","
+Attaching package: ‘Matrix’
+
+"
+"2","The following objects are masked from ‘package:tidyr’:
+
+    expand, pack, unpack
+
+"
+"2","Loaded glmnet 4.1-4
+"
+"0","library(C50)"
+"2","Warning:"
+"2"," package ‘C50’ was built under R version 4.1.3
+"
+"0","library(randomForest)"
+"2","Warning:"
+"2"," package ‘randomForest’ was built under R version 4.1.3
+"
+"2","randomForest 4.7-1
+"
+"2","Type rfNews() to see new features/changes/bug fixes.
+"
+"2","
+Attaching package: ‘randomForest’
+
+"
+"2","The following object is masked from ‘package:gridExtra’:
+
+    combine
+
+"
+"2","The following object is masked from ‘package:dplyr’:
+
+    combine
+
+"
+"2","The following object is masked from ‘package:ggplot2’:
+
+    margin
+
+"
+"0","library(boot)"
+"2","Warning:"
+"2"," package ‘boot’ was built under R version 4.1.3
+"
+"2","
+Attaching package: ‘boot’
+
+"
+"2","The following object is masked from ‘package:lattice’:
+
+    melanoma
+
+"
+"0","library(doParallel)"
+"2","Warning:"
+"2"," package ‘doParallel’ was built under R version 4.1.3
+"
+"2","Loading required package: foreach
+"
+"2","Warning:"
+"2"," package ‘foreach’ was built under R version 4.1.3
+"
+"2","
+Attaching package: ‘foreach’
+
+"
+"2","The following objects are masked from ‘package:purrr’:
+
+    accumulate, when
+
+"
+"2","Loading required package: iterators
+"
+"2","Warning:"
+"2"," package ‘iterators’ was built under R version 4.1.3
+"
+"2","Loading required package: parallel
+"
+"0","library(leaps)"
+"2","Warning:"
+"2"," package ‘leaps’ was built under R version 4.1.3
+"
+"0","library(gam)"
+"2","Warning:"
+"2"," package ‘gam’ was built under R version 4.1.3
+"
+"2","Loading required package: splines
+"
+"2","Loaded gam 1.20.1
+
+"
+"0","library(stats)"

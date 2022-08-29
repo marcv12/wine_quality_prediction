@@ -1,0 +1,885 @@
+---
+title: "Midetm_fin _proj"
+author: "Marc"
+date: "4/13/2022"
+output: html_document
+---
+
+Let's start by installing all required packages. I will assume you have already installed packages, but if not, just uncomment please.
+```{r}
+# install.packages("tidyverse",dependencies = T)
+# install.packages("corrplot")
+# install.packages("ggplot2")
+# install.packages("GGally")
+# install.packages("gridExtra")
+# install.packages("grid")
+# install.packages("ggplot2")
+# install.packages("caret")
+library(caret)
+library(dplyr)
+library(GGally)
+library(ggplot2)
+library(tidyverse)
+library(corrplot)
+
+```
+FIRST SET WD to source file location
+Here, we directly convert strings to factors. We could also do it at cleaning phase
+
+```{r}
+df_train <- read.csv(file = "bank_accounts_train.csv", 
+                     header=T,
+                     sep=",",
+                     dec=".",
+                     stringsAsFactors = T)
+df_test <- read.csv(file = "bank_accounts_test.csv", 
+                     header=T,
+                     sep=",",
+                     dec=".",
+                     stringsAsFactors = T)
+library(dplyr)
+```
+
+QUESTION 1
+
+Let's start by checking for missing values
+```{r}
+df_train %>% map(~ sum(is.na(.)))
+```
+
+Wonderful, no null values. Is it the case for the test set as well?
+df_test %>% map(~ sum(is.na(.)))
+
+It seems great, but we notice that we have a huge number of unknown variables scattered around our categorical features (marital and education). What should we do?
+
+1) Should we simply remove these data points:I do not see it as a logical thing to do since we would lose a lot of crucial data if we consider how many unknown values we have.
+
+2) Should we change missing data to a value (mean, median)? I think that this would introduce too much bias into the equation and I would prefer avoiding it
+
+3) Should we impute? This would still introduce some bias but would be the best solution to opt for, but isn't there something better that doesn't introduce bias?
+
+I think that here the optimal strategy is to leave values as unknown, not because I am lazy, but since the variables in question are Education level and marital status, you could argue that these values are not unknown but rather come down
+to the fact that the customer does not want to disclose this information because he/she feels that they are private information for which he is not open to share.
+If I had to guess, most unknown values would be uneducated and the customer prefers not to disclose it in fear of being judged. As for the marital status, it is more difficult to guess.
+
+
+QUESTION 2
+This will be the longest part of the whole project because I believe that a 
+good exploratory data analysis is extremely important and allows you to grasp
+your data in a meaningful way
+
+1st step: Getting to know our data
+
+dimensions of data
+```{r}
+dim_desc(df_train)
+dim_desc(df_test)
+```
+
+We immediately notice that there are less columns in test compared to train. This is because the "Closed account" variable is omitted. This is logical because we want to predict it in the test set.
+
+For now, we will only consider train data, as asked in the question but most of the analysis would be similar anyways!
+
+
+2nd step: Cleaning our data
+Since we already converted our strings to factors in the begining while importing the data, we must not do it again. Talk about killing two birds with one stone
+
+
+To avoid confusion, specify which unknown is for what category, and call it undisclosed for the aforementioned reasons.
+
+```{r}
+df_train$Education_Level <- recode_factor(df_train$Education_Level, 
+                                          Unknown = "Ed_undisclosed")
+
+df_train$Marital_Status <- recode_factor(df_train$Marital_Status, 
+                                          Unknown = "Marital_undisclosed")
+```
+
+Do same with test set, so we don't have to do it later
+
+```{r}
+df_test$Education_Level <- recode_factor(df_test$Education_Level, 
+                                          Unknown = "Ed_undisclosed")
+
+df_test$Marital_Status <- recode_factor(df_test$Marital_Status, 
+                                         Unknown = "Marital_undisclosed")
+```
+
+Encode target variable as factor. Since closed account is numerical, it did not convert to factor, and we must do it ourselves. But first, I like variables to be meaningful, so I will convert the values in the Closed Account variable to 
+strings "yes" and "no"
+
+Let's transform the target variable to be more clear
+```{r}
+df_train$Closed_Account[df_train$Closed_Account == 0] <- "no"
+df_train$Closed_Account[df_train$Closed_Account == 1] <- "yes"
+
+df_train$Closed_Account <- as.factor(df_train$Closed_Account)
+```
+
+As last step in cleaning, let's remove CLIENTNUM because it isn't informative
+```{r}
+df_train <- df_train %>% select(-CLIENTNUM)
+df_test <- df_test %>% select(-CLIENTNUM)
+```
+
+3rd step: The next step would have been to split the data, but since you have already done it for us we can go to the next step. However, we will later have to split our training data into validation set. But later problems for a later time!
+
+4th step: Let's start exploring the data. This is the longest phase so hold on!
+Let's start by seeing the correlation between NUMERICAL variables, I'll make sure not to include categorical variables ;). To do that, I will use is.numeric function
+
+
+```{r}
+# df_train %>% 
+#   select(Customer_Age, Dependent_count, Months_on_book, Income, Months_Inactive_12_mon,
+#          Credit_Limit, Total_Revolving_Bal, Avg_Open_To_Buy, Total_Amt_Chng_Q4_Q1,
+#          Total_Trans_Amt, Total_Relationship_Count, Contacts_Count_12_mon,
+#          Total_Trans_Ct, Total_Ct_Chng_Q4_Q1, Avg_Utilization_Ratio) %>% 
+#   cor()
+```
+
+Let's visualize things in a nice and understandable way
+```{r}
+df_train %>% 
+  select(Customer_Age, Dependent_count, Months_on_book, Income, Months_Inactive_12_mon,
+         Credit_Limit, Total_Revolving_Bal, Total_Amt_Chng_Q4_Q1,
+         Total_Trans_Amt, Total_Relationship_Count, Contacts_Count_12_mon,
+         Total_Trans_Ct, Total_Ct_Chng_Q4_Q1, Avg_Utilization_Ratio) %>% 
+  ggcorr()
+```
+Seeing Credit_Limit and Avg_Open_To_Buy are extremely highly correlated, let us exclude Avg_Open_To_Buy, as I think that it provides us with less crucial information than the credit limit. Anyways we will see after using AIC, whether this was the right choice. Same between transaction count and transaction amount, so I am tempted to remove one of them but I will not for now because we are using them for question 4 later on. I will also ignore difference between age and months_on_book for now because I think that both of them will be important in my analysis
+
+```{r}
+df_train$Avg_Open_To_Buy <- NULL
+df_test$Avg_Open_To_Buy <- NULL
+# df_train$Total_Trans_Ct <- NULL
+# df_test$Total_Trans_Ct <- NULL
+```
+
+Let's run a chi square test to find association between categorical variables:
+```{r}
+df_train_cat <- df_train %>% select(Gender, Education_Level, Marital_Status, Card_Category) 
+chisq.test(df_train$Gender, df_train$Education_Level) #not significant (p-val>0.05)
+chisq.test(df_train$Gender, df_train$Marital_Status) #not significant
+chisq.test(df_train$Gender, df_train$Card_Category) #significant
+chisq.test(df_train$Marital_Status, df_train$Education_Level) #not significant
+chisq.test(df_train$Marital_Status, df_train$Card_Category) #sig but unreliable
+chisq.test(df_train$Card_Category, df_train$Education_Level)#not significant
+```
+
+I do not observe any drastic association, but if I had to remove a variable, it would be card category, since it is significant in 2 of the tests. But we'll see that in 5 when choosing optimal model.
+
+
+Let's proceed with DATA VISUALISATION
+
+Starting with categorical variables
+
+```{r}
+library(gridExtra)
+library(grid)
+library(ggplot2)
+```
+
+Let's draw bar plots for categorical variables (NOTE: we could have also used pie charts, but for the purpose of my analysis, this way suits me more)
+```{r}
+p1 <- ggplot(df_train, aes(x=Gender)) + ggtitle("Gender") + xlab("Gender") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p2 <- ggplot(df_train, aes(x=Education_Level)) + ggtitle("Education level") + xlab("Education Level") + 
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p3 <- ggplot(df_train, aes(x=Marital_Status)) + ggtitle("Marital Status") + xlab("Marital Status") + 
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+p4 <- ggplot(df_train, aes(x=Card_Category)) + ggtitle("Card category") + xlab("Card Category") +
+  geom_bar(aes(y = 100*(..count..)/sum(..count..)), width = 0.5) + ylab("Percentage") + coord_flip() + theme_minimal()
+grid.arrange(p1, p2, p3, p4, ncol=2)
+```
+
+
+
+
+let's draw histograms for continuous numerical and bar plots for discrete
+```{r}
+p5 <- ggplot(df_train, aes(x=Customer_Age)) + ggtitle("Customer Age") + 
+  xlab("Customer_Age") + geom_histogram(fill="salmon")
+p6 <- ggplot(df_train, aes(x=Months_on_book )) + ggtitle("Months_on_book") + 
+  xlab("Months_on_book") + geom_histogram(fill="salmon") 
+p7 <- ggplot(df_train, aes(x=Income)) + ggtitle("Income") + xlab("Income") + 
+  geom_histogram(fill="salmon") + geom_boxplot()
+p8 <- ggplot(df_train, aes(x=Months_Inactive_12_mon)) + ggtitle("Months inactive(last_y)") +
+  xlab("Months Inactive") + geom_bar(fill="salmon")
+grid.arrange(p5, p6, p7, p8, ncol=2)
+
+p9 <- ggplot(df_train, aes(x=Credit_Limit)) + ggtitle("Credit Limit") + 
+  xlab("Credit_Limit") + geom_histogram(fill="salmon")
+p10 <- ggplot(df_train, aes(x=Total_Revolving_Bal )) + ggtitle("Total Balance")+ 
+  xlab("Total balance") + geom_histogram(fill="salmon") 
+p11 <- ggplot(df_train, aes(x=Total_Amt_Chng_Q4_Q1)) + ggtitle("Change in transaction amount") + xlab("Total change Q4_Q1") + 
+  geom_histogram(fill="salmon") + geom_boxplot()
+p12 <- ggplot(df_train, aes(x=Total_Relationship_Count)) + ggtitle("Number of products held by cust") + 
+  xlab("Number of products") + geom_bar(fill="salmon")
+grid.arrange(p9, p10, p11, p12, ncol=2)
+
+p13 <- ggplot(df_train, aes(x=Contacts_Count_12_mon)) + ggtitle("Number of contacts(this year)") + 
+  xlab("Number of contacts") + geom_bar(fill="salmon")
+p14 <- ggplot(df_train, aes(x=Total_Trans_Amt )) + ggtitle("Total transaction amount(this year)")+ 
+  xlab("Total transaction amount") + geom_histogram(fill="salmon") 
+p15 <- ggplot(df_train, aes(x=Avg_Utilization_Ratio)) + ggtitle("Average card utilization ratio") + 
+  xlab("Average utilization ratio") + geom_histogram(fill="salmon") 
+grid.arrange(p13, p14, p15, ncol=2)
+```
+
+
+Let's now check boxplots for numerical variables to see if there are some significant outliers
+NOTE: for this part, expand your plot window as much as you can
+
+```{r}
+par(mfrow=c(2,2))
+boxplot(df_train$Customer_Age, main="Customer Age")
+boxplot(df_train$Months_on_book, main="Months_on_book")
+boxplot(df_train$Income, main="Income")
+boxplot(df_train$Months_Inactive_12_mon, main="Months inactive")
+
+boxplot(df_train$Credit_Limit, main="Credit limit")
+boxplot(df_train$Total_Revolving_Bal, main="Total Balance")
+boxplot(df_train$Total_Amt_Chng_Q4_Q1, main="Total amount change")
+boxplot(df_train$Total_Relationship_Count, main= "Total number of products by customers")
+
+
+boxplot(df_train$Contacts_Count_12_mon, main="Number of contacts")
+boxplot(df_train$Total_Trans_Amt, main="Total Transaction Amount")
+boxplot(df_train$Avg_Utilization_Ratio, main="Avg card utilization ratio")
+```
+
+We notice that boxplot for total amount change has a lot of outliers so we filter them out like so:
+
+```{r}
+df_train %>%
+  filter(Total_Amt_Chng_Q4_Q1<1700) %>%
+  select(Total_Amt_Chng_Q4_Q1) %>%
+  boxplot(main="Total amount change")
+```
+Much better. Another thing we could have done is to scale the data, but we will see it later. Would it be logical to delete data pts with outliers? Absolutely not! We would be deleting data pts that may alter our data significantly. Let's analyze the data we got from our graphs.
+
+I will analyze things by splitting the variables into 2 categories: Demographic features and product features.
+1)Demographic features:
+Gender: we notice that there is a slightly higher proportion of females compared to males, but we 
+do not believe that this will affect churn rate
+➢ Income: most people in the dataset earn  around 40 and 60k, so not too wealthy and not too poor. Data is positively skewed (skewed to the right) and both median and mode are at 60k.We don't expect income to be strongly related to churn.
+➢ Education: Graduates far outnumber other categories. We don’t expect them to be rich since they spent all their money on college tuitions, which explains the preceding finding.
+➢ Age: We observe a symmetric normal distribution. with mode, median and mean around the middle. This means we mostly have mid-aged people, especially around 49 and 50 years old. This perhaps hints that we are 
+dealing with people who are supposed to be financially stable.
+➢ Dependents: most people have 2 to 4 dependents, which is pretty standard. Data is approximately uniformly distributed across these 3 values.
+
+2)Product features:
+➢ Card Category: majority of people have blue Cards and very few have silver, gold or Platinum. This leads us to believe that upgrading from blue is not for everyone in this company. 
+➢ Marital Status: considerably more married couples in our dataset compared to other categories. We would expect people to be financially stable here as well and therefore lean towards not churning.
+➢ Months on book: Clearly normally distributed and symmetric distribution with median, mode and mean all at 35. People in this dataset have been pretty loyal, or at least have stuck with this company for a long time, with a high number of people having spent 35 months.
+➢ Number of months inactive: The peak is at 3 months. This surprised us because a lot can happen in 3 months without being active. 
+➢ Number of contacts in the last 12 months: most people have had contacts 2 or 3 times. We must 
+say, contacting the bank is not a good sign for the bank in general.
+➢ Total transaction amount: it comes as no surprise that the peak is towards the beginning (at 
+around 5000 dollars) because we saw that the majority of people have an average income (and 
+who knows if it is with or without taxes). 
+➢ Credit limit: Clearly positively skewed with peak around 800 dollars. 
+➢ Average utilization ratio: Extremely positively skewed with most people using their card 0 times. It is logical since we have seen that total transaction amount is very low
+
+I will stop the analysis here and move to the next question. I could still draw interesting insights comparing these analyzed data with the churn variable individually (maybe through boxplot showing different categories, for example male and female and compare the rate of churn between these 2). However, we will analyze the model thoroughly throughout this project and I think I would just be wasting time and space.
+
+
+
+
+QUESTION 3
+
+Let's fit logistic regression model with income and gender
+```{r}
+fit <- glm(Closed_Account~Income * Gender, data=df_train, family=binomial(link="logit"))
+print(summary(fit))
+```
+
+Model is the following:
+log-odds(Closed_Account) = beta0 + beta1*Gender + beta2*Income + beta3*Income*Gender
+
+```{r}
+contrasts(df_train$Closed_Account)
+contrasts(df_train$Gender)
+
+fit$coefficients[1]
+Odds_churn_ref <- exp(fit$coefficients[1])
+Prob_churn_ref <- exp(fit$coefficients[1])/(1+exp(fit$coefficients[1]))
+```
+
+The reference individual (contact with 0 income and Female) has 17% (approx) probability to churn. In other words,we are looking at odds of churning (exp beta0 = 0.2) for customers with income=0 and gender=F. It becomes more interpretative if the numerical variables are centered around the mean: the reference individual becomes the one with average income
+
+
+The numerical variable: Income
+```{r}
+fit$coefficients[2]
+round(exp(fit$coefficients[2]))
+```
+Odds ratio between male and female when income = 0. Equal to 1 because no difference between both genders in our problem.
+
+
+```{r}
+bet0_bet1 <- exp(fit$coefficients[2]+fit$coefficients[1])
+```
+Odds of churning for clients with Gender=M, income=0 is 0.2. We see that it is the same value we got for beta0, so when income=0, odds of churning is approximately same for both genders. Can we assume that income has no effect on gender? We have still to see whether a change in a unit of income affects males and females differently
+
+
+The categorical variable
+```{r}
+fit$coefficients[3]
+exp(fit$coefficients[3]) 
+```
+When Gender=Female, the odds ratio of churning when 
+income increases by 1 unit is 0.67 (approx)
+
+```{r}
+fit$coefficients[4]
+exp_beta2_beta3 <- exp(fit$coefficients[4] + fit$coefficients[3])
+exp_beta2_beta3
+```
+Odds ratio of churn when gender = Male and income increases by 1 unit is 0.67 (approx)
+
+We notice that a change of one unit of income has the same effect on males and females, so we can conclude that indeed Income has same effect for males and females
+NOTE: Keep in mind that the interaction term and the income variable are not significant so previous conclusions may not be significant as well. Take them with a pinch of salt.
+If we scale, we would obtain more meaningful results, but for now let's keep it at that!
+
+
+
+QUESTION 4:
+
+```{r}
+#Selecting random seed to reproduce results
+set.seed(8)
+
+# train/validation split; 80%/20%
+train_index <- createDataPartition(df_train$Closed_Account, p = .8, 
+                                   list = FALSE, 
+                                   times = 1)
+train <- df_train[train_index, ]
+validation <- df_train[-train_index, ]
+
+require(class)
+require(pROC)
+require(dplyr)
+```
+
+We start by selecting the 2 requested numerical columns: trans_amt and trans_ct
+
+```{r}
+X_train <- train %>% dplyr::select(Total_Trans_Amt, Total_Trans_Ct)
+X_val <- validation %>% dplyr::select(Total_Trans_Amt, Total_Trans_Ct)
+Y_train <- train %>% pull(Closed_Account) # And the outcome also, obviously
+Y_val <- validation %>% pull(Closed_Account)
+
+
+#we proceed to scale training set
+X_trainScaled <- X_train %>% scale() %>% as_tibble()
+```
+
+We scale validation set USING MEAN AND SD OF TRAINING SET, OR ELSE WE WILL GET different values for same initial values
+
+```{r}
+train_m <- X_train %>% summarise(across(where(is.numeric), mean))
+train_s <- X_train %>% summarise(across(where(is.numeric), sd))
+X_valScaled <- X_val %>% scale(center=train_m, scale=train_s) %>% as_tibble()
+```
+
+Let's start with KNN first start with random number of K's
+
+```{r}
+kList <- 1:70
+```
+
+We will choose the best one based on AUC and computing the performances on the validation set because this is what you ask in the problem, but we could have used other metrics as well. I will also use misclassification error since we saw it in class and in the lab, but I won't base my results on it.
+
+```{r}
+#The larger the AUC, the better it is
+aucKNN_In <- rep(NA, length(kList))
+aucKNN_Out <- rep(NA, length(kList))  
+
+#The lower the misclassification error, the better it is
+miscKNN_In <- rep(NA, length(kList))
+miscKNN_Out <- rep(NA, length(kList)) 
+```
+
+I will use this beautiful function from the code you provided. Sorry for stealing it, but I couldn't find a better structured one and anyways I don't think there are too many ways to go around this problem differently
+
+```{r}
+for (i in 1:length(kList))
+{
+  # Arguments: training set, new data to predict upon, labels on the training set, k
+  oo_In <- knn(X_trainScaled, X_trainScaled, Y_train, k = kList[i], prob=T)
+  oo_Out <- knn(X_trainScaled, X_valScaled, Y_train, k = kList[i], prob=T)
+  
+  miscKNN_In[i] <- 1-mean(Y_train==oo_In)
+  miscKNN_Out[i] <- 1-mean(Y_val==oo_Out)
+  
+  # The probability is an attribute that gives the probability of the winning class
+  probyes_In <- ifelse(oo_In=="yes", attr(oo_In, "prob"), 
+                       1-attr(oo_In, "prob"))
+  probyes_Out <- ifelse(oo_Out=="yes", attr(oo_Out, "prob"), 
+                        1-attr(oo_Out, "prob"))
+  
+  aucKNN_In[i] <- pROC::auc(Y_train=="yes", probyes_In)
+  aucKNN_Out[i] <- pROC::auc(Y_val=="yes", probyes_Out)
+}
+
+# Plot the performances in MISCK
+
+plot(kList, miscKNN_In, type="b", lwd=2, ylim=c(0, .3), main="MISC train VS test",
+     ylab="MISC")
+lines(kList, miscKNN_Out, type="b", lwd=2, col=2, lty=1)
+legend("topright", c("Train", "Validation"), col=c(1,2), lty=c(1), bty="n", 
+       pch=21)
+#optimal number of k when using MISC
+(kStarMISC <- kList[which.min(miscKNN_Out)]) 
+abline(v=kStarMISC, col=4, lwd=2) #k=17
+(miscKNN_Star <- max(miscKNN_Out))
+```
+
+Here we observe a very ordinary situation, where training set starts with an extremely low misclassification error, which is normal since we are completely overfitting, and hence we observe that the validation set is at its highest pt.
+As we increase K, we notice that the MISC for validation set will decrease and it will increase for the training set, because we are overfitting less.
+
+
+Since in the question, you want us to use the AUC metric, I will the best K according to this metric
+
+```{r}
+# Plot the performances in AUC
+plot(kList, aucKNN_In, type="b", lwd=2, ylim=c(0.8, 1), main="AUC train VS test",
+     ylab="AUC")
+lines(kList, aucKNN_Out, type="b", lwd=2, col=2, lty=1)
+legend("bottomright", c("Train", "Validation"), col=c(1,2), lty=c(1), bty="n", 
+       pch=21)
+
+(kStarAUC <- kList[which.max(aucKNN_Out)]) 
+abline(v=kStarAUC, col=4, lwd=2) #k=30
+(aucKNN_Star <- max(aucKNN_Out))
+```
+Also here, we see that because of overfitting, AUC score for training at the begining is the maximum possible (=1), but as soon as we increase k, this value decrease and the AUC for validation increases.
+
+We will now compare the optimal number of k we get from MISC with the one we get from AUC. 
+I will choose the optimal k as being the k where the AUC is the maximum on the validation set
+
+
+we get really contradictory results when we compare what we got from MISC and AUC, but since we care about AUC, I am going to stick with that. But isn't there a better and more accurate way to get k? Indeed, there is: cross validation. 
+This is what I am going to use, with AUC as method. Since this code takes a lot of time to run, I will comment it out. Feel free to uncomment it and check it out! I will tell you what I got after it directly, so you can also trust me.
+
+Let's apply k Fold even though we just saw a glimpse of it in class, I think it will be really helpful here to figure out the optimal number of k
+
+```{r}
+# kFold_df <- df_train %>% 
+#   select(Total_Trans_Amt, Total_Trans_Ct, Closed_Account) 
+# 
+# kFold_df <- kFold_df %>% 
+#   mutate(Total_Trans_Amt = scale(Total_Trans_Amt), Total_Trans_Ct = scale(Total_Trans_Ct)) 
+# 
+# 
+# model <- train(
+#   Closed_Account~Total_Trans_Amt + Total_Trans_Ct, 
+  # data=kFold_df, 
+  # method='knn',
+  # tuneGrid=expand.grid(.k=1:50),
+  # metric="ROC",
+  # trControl=trainControl(
+  #   method='repeatedcv', 
+  #   number=10,
+  #   classProbs = TRUE,
+  #   repeats=3,
+  #   summaryFunction = twoClassSummary))
+
+# model
+# model$bestTune
+# plot(model)
+# confusionMatrix(model)
+```
+K-folds with AUC as a metric suggests us to use k=49. But since AUC does not improve a whole lot after 30, we are gonna stick to what we got with AUC (k=30) and discard what we got with MISC (k=17). But keep this in mind!
+
+
+```{r}
+# Let's plot the resulting decision boundary for the chosen k (with MISC)
+grid <- X_trainScaled %>% 
+  summarise(across(everything(), function(x) seq(min(x), max(x), length.out=200))) %>%
+  expand.grid()
+gridKNN_miscstar <- knn(X_trainScaled, grid, Y_train, k = kStarMISC)
+ggplot() +
+  geom_tile(aes(x=grid$Total_Trans_Amt, y=grid$Total_Trans_Ct, fill=gridKNN_miscstar), alpha=.5) + 
+  geom_point(aes(x=X_trainScaled$Total_Trans_Amt, y=X_trainScaled$Total_Trans_Ct, color=Y_train), 
+             alpha=.5) +
+  scale_color_manual("Truth", values = c('yellow', 'royal blue')) + 
+  scale_fill_manual("Decision regions", values = c('red3', 'limegreen')) + 
+  theme_bw()
+
+
+#plotting decision boundary for chosen k (with AUC)
+gridKNN_aucstar <- knn(X_trainScaled, grid, Y_train, k = kStarAUC)
+ggplot() +
+  geom_tile(aes(x=grid$Total_Trans_Amt, y=grid$Total_Trans_Ct, fill=gridKNN_aucstar), alpha=.5) + 
+  geom_point(aes(x=X_trainScaled$Total_Trans_Amt, y=X_trainScaled$Total_Trans_Ct, color=Y_train), 
+             alpha=.5) +
+  scale_color_manual("Truth", values = c('yellow', 'royal blue')) + 
+  scale_fill_manual("Decision regions", values = c('red3', 'limegreen')) + 
+  theme_bw()
+```
+
+
+
+Let's now go to LDA and QDA
+
+```{r}
+d_trainScale <- X_trainScaled %>% mutate(y=Y_train)
+d_valScale <- X_valScaled %>% mutate(y=Y_val)
+
+# LDA
+ooLDA <- MASS::lda(y~., data=d_trainScale)
+predLDA_Val <- predict(ooLDA, newdata = d_valScale)
+
+roc(Y_val=="yes", predLDA_Val$posterior[,2], plot=T)
+(aucLDA_Star <- pROC::auc(Y_val=="yes", predLDA_Val$posterior[,2]))
+
+
+# Let's plot the resulting decision boundary
+gridlda <- predict(ooLDA, newdata=grid)
+ggplot() +
+  geom_tile(aes(x=grid$Total_Trans_Amt, y=grid$Total_Trans_Ct, fill=gridlda$class), alpha=.5) + 
+  geom_point(aes(x=X_trainScaled$Total_Trans_Amt, y=X_trainScaled$Total_Trans_Ct, color=Y_train), 
+             alpha=.5) +
+  scale_color_manual("Truth", values = c('yellow', 'royal blue')) + 
+  scale_fill_manual("Decision regions", values = c('red3', 'limegreen')) + 
+  theme_bw()
+#seems much worse than KNN
+
+
+# QDA
+ooQDA <- MASS::qda(y~., data=d_trainScale)
+predQDA_Val <- predict(ooQDA, newdata = d_valScale)
+
+pROC::roc(Y_val=="yes", predQDA_Val$posterior[,2], plot=T)
+(aucQDA_Star <- pROC::auc(Y_val=="yes", predQDA_Val$posterior[,2]))
+
+# Let's plot the resulting decision boundary
+gridqda <- predict(ooQDA, newdata=grid)
+ggplot() +
+  geom_tile(aes(x=grid$Total_Trans_Amt, y=grid$Total_Trans_Ct, fill=gridqda$class), alpha=.5) + 
+  geom_point(aes(x=X_trainScaled$Total_Trans_Amt, y=X_trainScaled$Total_Trans_Ct, color=Y_train), 
+             alpha=.5) +
+  scale_color_manual("Truth", values = c('yellow', 'royal blue')) + 
+  scale_fill_manual("Decision regions", values = c('red3', 'limegreen')) + 
+  theme_bw()
+#seems like an awful job
+```
+
+
+Pick the best model! 
+```{r}
+# Best model on validation set according to the AUC
+c(KNN=aucKNN_Star, LDA=aucLDA_Star, QDA=aucQDA_Star)
+```
+We pick KNN because AUC is the highest, being equal to 0.94 and the second is not even close at 0.85. We will not even need to use optimal numbe of K that we got doing cross validation, since KNN already far outperforms the other 2 models.
+
+
+
+QUESTION 5:
+
+Since we already did train/validation split, we can use what we had from the previous question
+
+```{r}
+require(caret)
+
+myfit1 <- glm(Closed_Account~., family = "binomial", data = train)
+summary(myfit1)
+
+
+library(stats)
+#Let's perform AIC to improve original model
+
+myfit2.AIC <- step(myfit1, direction = "both")
+summary(myfit2.AIC)
+```
+
+This model does a pretty good job at keeping mostly significant variables. However, we must remember that the p-value mostly refers to the interpretation the variables and not always to the model performance. That being said, this 
+model is not satisfactory to my taste because it still contains a lot of variables that are highly correlated (mainly Transaction count and Transaction amount)but it got rid of avg_open_to_buy which was also a higly correlated variable with Credit limit.
+
+
+Let's see if BIC will do a better job: already know it's gonna be more conservative
+
+```{r}
+myfit3.BIC <- step(myfit1, direction = "both", k=log(nrow(train)))
+summary(myfit3.BIC)
+
+require(tidyverse)
+```
+There is no much difference between AIC and BIC models and we will evaluate them more carefully later on (but only 1 variable seperates them),so you would imagine an indifference between choosing any of the 2 (won't cause significant difference in AUC performance)
+
+
+Model evaluation
+```{r}
+#Let's start with training set, no predictions needed
+#we'll fix a more accurate treshold later: for now let's just stick to basics
+tresh <- 0.5
+# We must transform the estimated probabilities in labels
+stepAicPreds <- ifelse(myfit2.AIC$fitted.values>tresh, "yes", "no") %>% 
+  as.factor()
+stepBicPreds <- ifelse(myfit3.BIC$fitted.values>tresh, "yes", "no") %>% 
+  as.factor()
+
+
+# creating a confusion matrix
+confusionMatrix(stepAicPreds, train$Closed_Account, positive = "yes")
+confusionMatrix(stepBicPreds, train$Closed_Account, positive = "yes")
+
+
+
+#Let's now see what we get for validation set
+stepAicPredsOut <- ifelse(predict(myfit2.AIC, newdata=validation, 
+                                  type = "response")>0.5, "yes", "no") %>% 
+  as.factor()
+stepBicPredsOut <- ifelse(predict(myfit3.BIC, newdata=validation, 
+                                  type = "response")>0.5, "yes", "no") %>% 
+  as.factor()
+
+confusionMatrix(stepAicPredsOut, validation$Closed_Account, positive = "yes")
+confusionMatrix(stepBicPredsOut, validation$Closed_Account, positive = "yes")
+```
+
+ROC and AUC: we want to evaluate our model based on AUC once again, so we will select model with best AUC even if accuracy (or any other metric) suggest otherwise
+
+
+```{r}
+# On the train set
+library(pROC)
+ROCAic <- roc(train$Closed_Account, myfit2.AIC$fitted.values, plot = TRUE,
+              legacy.axes=TRUE, col="midnightblue", lwd=3,
+              auc.polygon=T, auc.polygon.col="lightblue", print.auc=T)
+ROCBic <- roc(train$Closed_Account, myfit3.BIC$fitted.values, plot = TRUE,
+              legacy.axes=TRUE, col="midnightblue", lwd=3,
+              auc.polygon=T, auc.polygon.col="lightblue", print.auc=T)
+
+
+idx <- which.min(abs(ROCAic$thresholds-0.5)) 
+# No need to extract sensitivity and specificity, since we did it before
+
+
+# The AUC can be extracted in this way: the closer it is to 1 the better it is
+ROCAic$auc
+ROCBic$auc
+```
+We notice that AIC performs very slightly better (+0.001) and it is something we could expect because AIC has more variables and hence has a higher tendency to overfitting. In the case of such minimal difference, I believe it is better
+to choose model with the lesser variables so for now BIC is in the lead. But you may find me use AIC later on because I believe the difference in performance is negligeable!
+
+```{r}
+# What about the test
+ROCAicOut <- roc(validation$Closed_Account, predict(myfit2.AIC, newdata=validation, 
+                                  type = "response"), plot = TRUE,
+                 legacy.axes=TRUE, col="midnightblue", lwd=3,
+                 auc.polygon=T, auc.polygon.col="lightblue", print.auc=T)
+ROCBicOut <- roc(validation$Closed_Account, predict(myfit3.BIC, newdata=validation, 
+                                  type = "response"), plot = TRUE,
+                 legacy.axes=TRUE, col="midnightblue", lwd=3,
+                 auc.polygon=T, auc.polygon.col="lightblue", print.auc=T)
+
+ROCAicOut$auc
+ROCBicOut$auc
+```
+
+We observe that also for test set auc of AIC is slightly better, but negligeable difference, so I will go with BIC model
+
+Let's see if Total_trans_amt and Total_trans_ct are still highly correlated. I will not show all the code because I think it is a waste of space. I found out that they were still correlated but when I tried removing one of the 2, the model's performance (With respect to AUC) drastically dropped, so I decided to keep AIC/BIC models as they are.
+
+
+```{r}
+#Here is our AIC model clearly showed. I did this because I #like to get a better idea of things
+train <- train %>% 
+  select(Dependent_count, Months_Inactive_12_mon, Total_Revolving_Bal, 
+         Total_Amt_Chng_Q4_Q1, Total_Relationship_Count, 
+         Contacts_Count_12_mon, Total_Trans_Ct, Total_Ct_Chng_Q4_Q1, Gender, 
+         Marital_Status, Closed_Account, Total_Trans_Amt
+         ) 
+
+best_model <- glm(Closed_Account~ Dependent_count + Months_Inactive_12_mon + 
+                  Total_Revolving_Bal + Total_Relationship_Count + 
+                  Contacts_Count_12_mon + Total_Trans_Ct + Total_Ct_Chng_Q4_Q1 +
+                  Gender + Marital_Status +Total_Trans_Amt, family = "binomial", data = train)  
+```
+
+
+Let's use k-folds to get a more reliable AUC measure
+
+```{r}
+fitControl <- trainControl(## 10-fold CV
+  method = "repeatedcv",
+  number = 5,
+  ## repeated 8 times
+  repeats = 8,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary)
+
+
+logreg <- train(Closed_Account~ Dependent_count + Months_Inactive_12_mon + 
+                Total_Revolving_Bal + Total_Relationship_Count + 
+                Contacts_Count_12_mon + Total_Trans_Ct + Total_Ct_Chng_Q4_Q1 +
+                Gender + Marital_Status +Total_Trans_Amt, train,
+                method = "glm",
+                family = "binomial",
+                trControl = fitControl,
+                metric = "ROC")
+logreg
+
+myfit3.BIC
+df_test <- df_test %>% select(Dependent_count, Months_Inactive_12_mon,
+                                Total_Revolving_Bal, Total_Relationship_Count, Total_Amt_Chng_Q4_Q1, 
+                                Contacts_Count_12_mon, Total_Trans_Ct, Total_Ct_Chng_Q4_Q1,
+                                Gender, Marital_Status, Total_Trans_Amt)
+```
+
+Let's create a column called closed_acc for the test set. It will contain our predictions for the test set. These cannot be checked since we don't originally have that column
+
+```{r}
+Closed_acc <- ifelse(predict(myfit3.BIC, newdata=df_test, 
+                                   type = "response")>0.5, "yes", "no") %>% 
+                      as.factor()
+
+#Let's add Closed_acc to the test set
+cbind(df_test,Closed_acc)
+
+#Let's create a .csv file from df_test of only predicted probabilities as per 
+#your request
+write.csv(Closed_acc, "probs_pred.csv", row.names = F)
+
+
+#to verify if it works, we run the following command
+read.csv(file = "probs_pred.csv", 
+         header=T,
+         sep=",",
+         dec=".",
+         )
+```
+ALL GOOD!
+
+
+
+QUESTION 6
+
+Cost matrix
+
+1. Predicting that a customer won't churn but they actually do: $50.
+2. Predicting that a customer would churn and they actually would: $-20 (50-20=30)
+3. Predicting that a customer will churn but they won't: $-20
+4. Predicting that a customer won't churn and they actually wouldn't: $-50
+
+In other words,
+FN = $50
+TP = $-20
+FP = $-20
+TN = $-50
+
+So we get: Cost = 50FN - 20TP - 20FP - 50TN
+
+Let's apply this cost evaluation to our model
+
+```{r}
+thresh <- seq(0.1,1.0, length = 10)
+
+#cost vector
+cost_tr = rep(0,length(thresh))
+
+
+#for training set, let's see what treshold is the best to use to minimize costs
+#for training set
+for (i in 1:length(thresh)){
+  
+  glm = rep("no", length(myfit2.AIC$fitted.values))
+  glm[myfit2.AIC$fitted.values > thresh[i]] = "yes"
+  glm <- as.factor(glm)
+  x <- confusionMatrix(glm, train$Closed_Account, positive = "yes")
+  TN <- x$table[1]
+  FP <- x$table[2]
+  FN <- x$table[3]
+  TP <- x$table[4]
+  cost_tr[i] = FN*50 + TP*(-20) + FP*(-20) + TN*(-50)
+}
+
+x <- confusionMatrix(glm, train$Closed_Account, positive = "yes")
+TN <- x$table[1]
+FP <- x$table[2]
+FN <- x$table[3]
+TP <- x$table[4]
+cost_simple_tr = FN*50 + TP*(-20) + FP*(-20) + TN*(-50)
+
+
+
+# putting results in a dataframe for plotting
+dat <- data.frame(
+  model = c(rep("optimized",10),"simple"),
+  cost_per_customer = c(cost_tr,cost_simple_tr),
+  threshold = c(thresh,0.5)
+)
+
+# plotting
+plot <- ggplot(dat, aes(x = threshold, y = cost_per_customer, group = model, colour = model)) +
+  geom_line() +
+  geom_point()
+
+
+
+# cost as a function of threshold
+churn.probs.AIC <- predict(myfit2.AIC, validation, type = "response")
+  
+churn.probs.BIC <- predict(myfit3.BIC, validation, type = "response") 
+
+cost = rep(0,length(thresh))
+require(caret)
+
+for (i in 1:length(thresh)){
+  
+  glm.pred = rep("no", length(churn.probs.AIC))
+  glm.pred[churn.probs.AIC > thresh[i]] = "yes"
+  glm.pred <- as.factor(glm.pred)
+  x <- confusionMatrix(glm.pred, validation$Closed_Account, positive = "yes")
+  TN <- x$table[1]
+  FP <- x$table[2]
+  FN <- x$table[3]
+  TP <- x$table[4]
+  cost[i] = FN*50 + TP*(-20) + FP*(-20) + TN*(-50)
+}
+
+
+#for the simple model, take treshold as 0.5
+glm.pred = rep("no", length(churn.probs.AIC))
+glm.pred[churn.probs.AIC > 0.5] = "yes"
+glm.pred <- as.factor(glm.pred)
+
+x <- confusionMatrix(glm.pred, validation$Closed_Account, positive = "yes")
+TN <- x$table[1]
+FP <- x$table[2]
+FN <- x$table[3]
+TP <- x$table[4]
+cost_simple = FN*50 + TP*(-20) + FP*(-20) + TN*(-50)
+
+
+
+# putting results in a dataframe for plotting
+dat <- data.frame(
+  model = c(rep("optimized",10),"simple"),
+  cost_per_customer = c(cost,cost_simple),
+  threshold = c(thresh,0.5)
+)
+
+
+
+# plotting
+plot2 <- ggplot(dat, aes(x = threshold, y = cost_per_customer, group = model, colour = model)) +
+  geom_line() +
+  geom_point()
+
+par(mfrow=c(1,2))
+grid.arrange(plot,plot2, ncol=2)
+```
+
+The best threshold to use is around 0.25. This means that we will allow False positives much more than we will allow false negatives, because the gain we get from sending an email is superior to the option of not sending one in this case. We could also check for BIC, but since there is only one more variable in BIC compared to AIC, we will approximately get the same results, so I will not do it.
+NOTE: this is total cost, not cost per customer as indicated on y axis.
+
+PLEASE SEE OTHER FILE FOR PART 2
+
+
+
+
+

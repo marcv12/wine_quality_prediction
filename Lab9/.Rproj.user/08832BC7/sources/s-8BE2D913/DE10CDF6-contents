@@ -1,0 +1,341 @@
+library(ISLR)
+library(tidyverse)
+library(RColorBrewer)
+library(splines)
+data(Auto)
+
+
+p0 = ggplot(Auto, aes(x=horsepower, y=mpg)) + 
+  geom_point(col="#00000050")
+
+p = p0
+for(i in 1:9){
+  p = p +
+    stat_smooth(method = "lm", formula=paste0("y~poly(x,", i, ", raw=T)"), se=F, col=brewer.pal(9, "YlGnBu")[i], fullrange = T)
+}
+p
+
+# let's extend the range...
+p + 
+  expand_limits(x = c(30, 250))
+
+
+
+# step functions ------------------------------------------------------------------------------------------------
+
+# split a variable into factors
+x_cut = cut(x = Auto$horsepower, 3)
+
+fit_step = lm(mpg ~ cut(x = horsepower, 3), data=Auto)
+summary(fit_step)
+
+p = p0 +
+  stat_smooth(method = "lm", formula=paste0("y~cut(x,", 3, ")"), se=F, col=brewer.pal(9, "YlGnBu")[3], fullrange = T)
+p
+
+p = p0
+for(i in c(2,4,8)){
+  p = p +
+    stat_smooth(method = "lm", formula=paste0("y~cut(x,", i, ")"), se=F, col=brewer.pal(9, "YlGnBu")[i], fullrange = T)
+}
+p
+
+
+
+
+# splines -------------------------------------------------------------------------------------------------------------
+
+library(splines)
+# b-splines
+bs(x=Auto$horsepower, df=7) %>% head
+bs(x=Auto$horsepower, knots = c(75, 125, 175)) %>% head
+
+fit_bs = lm(mpg ~ bs(x=horsepower, knots = c(75, 125, 175)), data=Auto)
+summary(fit_bs)
+
+df_grid = data.frame(
+  horsepower = seq(min(Auto$horsepower), max(Auto$horsepower), l=1e3)
+)
+
+df_grid$pred_bs = predict(fit_bs, df_grid)
+
+p = p0 + 
+  geom_line(data = df_grid, mapping = aes(x=horsepower, y=pred_bs), col=brewer.pal(9, "YlGnBu")[5], lwd=1) 
+p  
+
+
+# more df
+fit_bs2 = lm(mpg ~ bs(x=horsepower, df = 30), data=Auto)
+summary(fit_bs)
+df_grid$pred_bs2 = predict(fit_bs2, df_grid)
+
+p = p + 
+  geom_line(data = df_grid, mapping = aes(x=horsepower, y=pred_bs2), col=brewer.pal(9, "YlGnBu")[7], lwd=1) 
+p  
+
+
+
+# natural splines
+a = ns(x=Auto$horsepower, df=7)
+# the matrix a has some attributes containing information about the knots
+str(a)
+# the degrees of freedom for a ns are df = k_in + 1
+attr(a, "knots")
+# additional boundary knots correspond to observed range for x
+attr(a, "Boundary.knots")
+range(Auto$horsepower)
+
+
+ns(x=Auto$horsepower, df=7) %>% head
+ns(x=Auto$horsepower, knots = c(75, 125, 175)) %>% head
+
+fit_ns = lm(mpg ~ ns(x=horsepower, knots = c(75, 125, 175)), data=Auto)
+#fit_ns = lm(mpg ~ ns(x=horsepower, df=30), data=Auto)
+
+summary(fit_ns)
+
+
+df_grid$pred_ns = predict(fit_ns, df_grid)
+
+p = p0 + 
+  geom_line(data = df_grid, mapping = aes(x=horsepower, y=pred_ns), col=brewer.pal(9, "YlGnBu")[4], lwd=1) 
+p  
+
+
+
+df_grid2 = data.frame(
+  horsepower = seq(30, 250, l=1e3)
+)
+df_grid2$pred_bs = predict(fit_bs, df_grid2)
+df_grid2$pred_ns = predict(fit_ns, df_grid2)
+
+
+p = p0 + 
+  geom_line(data = df_grid2, mapping = aes(x=horsepower, y=pred_bs), col=brewer.pal(9, "YlGnBu")[7], lwd=1) +
+  geom_line(data = df_grid2, mapping = aes(x=horsepower, y=pred_ns), col=brewer.pal(9, "YlGnBu")[4], lwd=1) 
+p  
+
+
+# smooting splines -------------
+fit_ss = line(x = Auto$horsepower, y= Auto$mpg)
+fit_ss
+fit_ss$cv.crit
+fit_ss$df
+
+mean(((fitted(fit_ss)- Auto$mpg)/(1 - fit_ss$df/nrow(Auto)))^2)
+
+df_grid2$pred_ss = predict(object = fit_ss, x = df_grid2$horsepower)$y
+
+p = p0 + 
+  geom_line(data = df_grid2, mapping = aes(x=horsepower, y=pred_ss, col="natural"), lwd=1) +
+  geom_line(data = df_grid2, mapping = aes(x=horsepower, y=pred_ns, col="smooth"), lwd=1) +
+  scale_colour_manual(name = 'spline', values =c("smooth" = brewer.pal(9, "YlGnBu")[7],
+                                                 "natural"  = brewer.pal(9, "YlGnBu")[4]), 
+                      breaks = c("smooth", "natural"), labels = c("smooth, df = 5.8", "natural, df=7"))
+p  
+
+
+# what if K = n?
+set.seed(2)
+n = 10
+x = runif(n, min =0, max=1)
+y = 0.5*sin(pi*x) - 0.5*x + 0.5*rnorm(n)
+
+plot(x, y, asp=1)
+a = ns(x=x, df=n-1)
+str(a)
+fit_ns_full = 
+  lm(y ~ ns(x=x, df=n-1))
+fit_bs_full = 
+  lm(y ~ bs(x=x, df=n-1))
+fit_bs_full2 = 
+  lm(y ~ bs(x=x, df=n-1, degree = 5))
+
+
+df_grid3 = data.frame(x=seq(0.11,0.95, l=1e3))
+df_grid3$pred_ns_full = predict(fit_ns_full, df_grid3)
+df_grid3$pred_bs_full = predict(fit_bs_full, df_grid3)
+df_grid3$pred_bs_full2 = predict(fit_bs_full2, df_grid3)
+
+df_grid3$true_f = 0.5*sin(pi*df_grid3$x) - 0.5*df_grid3$x 
+
+
+p = 
+  ggplot(data.frame(x=x, y=y),aes(x=x, y=y)) + 
+  geom_point() +
+  geom_line(data = df_grid3, mapping = aes(x=x, y=pred_ns_full, col="natural"), lwd=1, alpha=0.5) +
+  geom_line(data = df_grid3, mapping = aes(x=x, y=pred_bs_full, col="cubic"), lwd=1, alpha=0.5) +
+  geom_line(data = df_grid3, mapping = aes(x=x, y=pred_bs_full2, col="quintic"), lwd=1, alpha=0.5) +
+  #geom_line(data = df_grid3, mapping = aes(x=x, y=true_f)) +
+  scale_colour_manual(name = 'spline', values =c("natural"= brewer.pal(9, "YlGnBu")[4],
+                                           "cubic"  = brewer.pal(9, "YlGnBu")[6],
+                                           "quintic"= brewer.pal(9, "YlGnBu")[9]), 
+                      breaks = c("natural", "cubic", "quintic"))
+
+p
+
+
+
+
+# kernel smoothing, local regression ----------------------------------------------------------------------------
+
+# kernel smoothing
+fit_ks = ksmooth(y=Auto$mpg, x=Auto$horsepower, x.points = df_grid2$horsepower, bandwidth = 100)
+
+df_grid2$pred_ks = fit_ks$y
+
+
+p = p0 + 
+  geom_line(data = df_grid2, mapping = aes(x=horsepower, y=pred_ks), col=brewer.pal(9, "YlGnBu")[7], lwd=1) 
+p  
+
+# local linear regression, tri-cube kernel
+fit_lo = loess(mpg ~ horsepower, degree=1, data=Auto)
+fit_lo2 = loess(mpg ~ horsepower, degree=1, data=Auto, span = 0.2)
+fit_lo3 = loess(mpg ~ horsepower, data=Auto, span = 0.5)
+
+df_grid2$pred_lo = predict(fit_lo, df_grid2$horsepower)
+df_grid2$pred_lo2 = predict(fit_lo2, df_grid2$horsepower)
+df_grid2$pred_lo3 = predict(fit_lo3, df_grid2$horsepower)
+
+
+# compare local linear, different spans
+p = p0 + 
+  geom_line(data = df_grid2, mapping = aes(x=horsepower, y=pred_lo), col=brewer.pal(9, "YlGnBu")[3], lwd=1) +
+  geom_line(data = df_grid2, mapping = aes(x=horsepower, y=pred_lo2), col=brewer.pal(9, "YlGnBu")[6], lwd=1) 
+p
+
+
+# compare local linear and local quadratic
+p = p0 + 
+  geom_line(data = df_grid2, mapping = aes(x=horsepower, y=pred_lo), col=brewer.pal(9, "YlGnBu")[3], lwd=1) +
+  geom_line(data = df_grid2, mapping = aes(x=horsepower, y=pred_lo3), col=brewer.pal(9, "YlGnBu")[8], lwd=1) 
+
+p  
+
+
+# to predict outside the range
+fit_lo4 = loess(mpg ~ horsepower, data=Auto, control=loess.control(surface="direct"))
+
+df_grid2$pred_lo4 = predict(fit_lo4, df_grid2$horsepower)
+
+# compare local linear and "interpolate"
+p = p0 + 
+  geom_line(data = df_grid2, mapping = aes(x=horsepower, y=pred_lo), col=brewer.pal(9, "YlGnBu")[3], lwd=1) +
+  geom_line(data = df_grid2, mapping = aes(x=horsepower, y=pred_lo4), col=brewer.pal(9, "YlGnBu")[8], lwd=1, alpha=0.8) 
+
+
+p
+
+
+
+# get the trace of the hat matrix
+fit_lo$trace.hat
+gcv_lo = function(s){
+  fit_temp = fit_lo = loess(mpg ~ horsepower, spar = s, data=Auto)
+  gcv = mean((fit_temp$y - fitted(fit_temp))^2) / (1 - fit_temp$trace.hat/nrow(Auto))^2
+  return(gcv)
+}
+
+gcv_lo(0.5)
+optimize(gcv_lo, interval = c(.01, 0.99))
+
+fit_lo_opt = loess(mpg ~ horsepower, degree=1, spar = 0.9899359, data=Auto)
+fit_ss$cv.crit
+
+
+
+
+# gam -------------------------------------------------------
+library(gam)
+library(caret)
+
+fit_ga = gam(mpg ~ s(horsepower, df=5) + lo(acceleration, span=0.5), data=Auto)
+
+
+summary(fit_ga)
+plot(fit_ga)
+
+fit_ga2 = gam(mpg ~ s(horsepower, df=5) + lo(acceleration, span=0.5) + s(I(horsepower*acceleration), df=5), 
+              data=Auto, control = gam.control(bf.maxit = 500))
+
+summary(fit_ga2)
+plot(fit_ga2)
+df_grid2$acceleration = seq(min(Auto$acceleration), max(Auto$acceleration), l=1e3)
+pred_ga = predict(fit_ga2, df_grid2)
+
+
+
+# MIDTERM data: gam -----------------------
+
+library(gam)
+library(pROC)
+library(tidyverse)
+#install.packages("akima")
+
+bank_df = read.csv("bank_accounts_train.csv")
+bank_df = unique(bank_df)
+
+bank_te = read.csv("bank_accounts_test_y.csv")
+
+# scale vars, except discrete ones
+bank_df = bank_df %>% dplyr::select(-CLIENTNUM) %>%
+  mutate(across(!where(is.character) & !c(Customer_Age, Months_Inactive_12_mon, Total_Relationship_Count, Contacts_Count_12_mon, Months_on_book, Closed_Account), .fns=~c(scale(.x)))) %>%
+  mutate(across(where(is.character), .fns=as.factor)) 
+bank_te = bank_te %>% dplyr::select(-CLIENTNUM) %>%
+  mutate(across(!where(is.character) & !c(Customer_Age, Months_Inactive_12_mon, Total_Relationship_Count, Contacts_Count_12_mon, Months_on_book, Closed_Account), .fns=~c(scale(.x)))) %>%
+  mutate(across(where(is.character), .fns=as.factor)) 
+
+# remove missing
+bank_df[bank_df=="Unknown"] = NA
+bank_te[bank_te=="Unknown"] = NA
+
+bank_df = bank_df[complete.cases(bank_df),]
+bank_te = bank_df[complete.cases(bank_te),]
+
+# response as factor
+bank_df$Closed_Account = as.factor(bank_df$Closed_Account)
+bank_te$Closed_Account = as.factor(bank_te$Closed_Account)
+
+
+# create spline formula
+num_names = names(bank_df)[bank_df %>% map_lgl(is.numeric)]
+num_names = num_names %>% 
+  discard(~.x %in% c("Credit_Limit", "Dependent_count", "Months_on_book", "Income", "Customer_Age", "Months_Inactive_12_mon", "Total_Relationship_Count", "Contacts_Count_12_mon"))
+num_feat = num_names %>% 
+  map_chr(~paste0("s(", .x, ", 10)")) %>%
+  paste(collapse = "+")
+
+int_feat = NULL
+int_names = c("Total_Trans_Amt ", "Total_Trans_Ct", "Total_Amt_Chng_Q4_Q1", "Total_Ct_Chng_Q4_Q1")
+for( i in 1:(length(int_names)-1)){
+  for(j in (i+1):length(int_names)){
+    int_feat = c(int_feat, paste0("s(I(", int_names[i], "*",int_names[j], "), 5)"))
+  }
+}
+
+int_feat = paste(int_feat, collapse = "+")
+
+cat_feat = names(bank_df)[bank_df %>% map_lgl(is.factor)] %>% 
+  discard(~.x == "Closed_Account") %>%
+  paste(collapse = "+")
+
+
+
+gam_form = as.formula(paste0("Closed_Account ~", num_feat, "+", cat_feat))
+gam_form = as.formula(paste0("Closed_Account ~", num_feat))
+gam_form = as.formula(paste0("Closed_Account ~", num_feat, "+", int_feat, 
+                             "+ cut(Months_Inactive_12_mon, breaks = -1:6) + cut(Customer_Age, breaks = c(0, 35, 50, 65, 100)) +
+                                cut(Total_Relationship_Count, breaks = -1:6) + cut(Contacts_Count_12_mon, breaks = -1:6)" ))
+
+fit_gam = gam(formula = gam_form, family = "binomial", data=bank_df)
+
+summary(fit_gam)
+plot(fit_gam)
+
+pred_gam = predict(fit_gam, bank_te, type = "response")
+
+roc(response = bank_te$Closed_Account, predictor = pred_gam, plot=T, print.auc=T)
+
+
+

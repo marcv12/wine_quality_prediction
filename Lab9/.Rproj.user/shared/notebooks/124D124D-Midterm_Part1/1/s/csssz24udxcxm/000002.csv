@@ -1,0 +1,7 @@
+"0","#The larger the AUC, the better it is"
+"0","aucKNN_In <- rep(NA, length(kList))"
+"0","aucKNN_Out <- rep(NA, length(kList))  "
+"0",""
+"0","#The lower the misclassification error, the better it is"
+"0","miscKNN_In <- rep(NA, length(kList))"
+"0","miscKNN_Out <- rep(NA, length(kList)) "

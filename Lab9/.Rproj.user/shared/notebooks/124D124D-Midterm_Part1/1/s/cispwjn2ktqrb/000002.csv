@@ -1,0 +1,5 @@
+"0","df_test$Education_Level <- recode_factor(df_test$Education_Level, "
+"0","                                          Unknown = ""Ed_undisclosed"")"
+"0",""
+"0","df_test$Marital_Status <- recode_factor(df_test$Marital_Status, "
+"0","                                         Unknown = ""Marital_undisclosed"")"

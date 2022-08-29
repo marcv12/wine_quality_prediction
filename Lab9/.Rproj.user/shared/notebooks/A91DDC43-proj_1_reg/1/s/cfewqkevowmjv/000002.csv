@@ -1,0 +1,6 @@
+"0","set.seed(1)"
+"0","#Analysis of some variables with respect to quality to get some interesting insights"
+"0","#as requested by you and as I did in the midterm. Lower dimensional model"
+"0","myfirstfit = lm(quality~alcohol*pH, data=trainScaled)"
+"2","Error in is.data.frame(data) : object 'trainScaled' not found
+"

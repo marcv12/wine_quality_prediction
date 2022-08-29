@@ -1,0 +1,6 @@
+"0","df <- read.csv(file = ""WineQuality.csv"", "
+"0","                     header=T,"
+"0","                     sep="","","
+"0","                     dec=""."","
+"0","                     stringsAsFactors = T)"
+"0",""

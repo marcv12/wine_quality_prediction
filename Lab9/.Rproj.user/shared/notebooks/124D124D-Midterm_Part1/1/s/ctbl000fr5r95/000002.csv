@@ -1,0 +1,6 @@
+"0","Closed_acc <- ifelse(predict(myfit3.BIC, newdata=df_test, "
+"0","                                   type = ""response"")>0.5, ""yes"", ""no"") %>% "
+"0","                      as.factor()"
+"0",""
+"0","#Let's add Closed_acc to the test set"
+"0","cbind(df_test,Closed_acc)"

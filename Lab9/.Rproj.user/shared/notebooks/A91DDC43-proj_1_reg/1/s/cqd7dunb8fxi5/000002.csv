@@ -1,0 +1,21 @@
+"0","p1 <- ggplot(df, aes(x=fixed.acidity)) + ggtitle(""Fixed Acidity"") + "
+"0","  xlab(""Fixed acidity"") + geom_histogram(fill=""salmon"")"
+"0","p2 <- ggplot(df, aes(x=volatile.acidity )) + ggtitle(""Volatile Acidity"") + "
+"0","  xlab(""Volatile acidity"") + geom_histogram(fill=""salmon"") "
+"0","p3 <- ggplot(df, aes(x=citric.acid)) + ggtitle(""Citric acid"") + xlab(""Citric acid"") + "
+"0","  geom_histogram(fill=""salmon"") "
+"0","p4 <- ggplot(df, aes(x=residual.sugar)) + ggtitle(""residual sugar"") +"
+"0","  xlab(""residual sugar"") + geom_histogram(fill=""salmon"")"
+"0","grid.arrange(p1, p2, p3, p4, ncol=2)"
+"2","`stat_bin()` using `bins = 30`. Pick better value
+with `binwidth`.
+"
+"2","`stat_bin()` using `bins = 30`. Pick better value
+with `binwidth`.
+"
+"2","`stat_bin()` using `bins = 30`. Pick better value
+with `binwidth`.
+"
+"2","`stat_bin()` using `bins = 30`. Pick better value
+with `binwidth`.
+"

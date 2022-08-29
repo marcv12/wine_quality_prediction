@@ -1,0 +1,7 @@
+"0","#optimal number of k when using MISC"
+"0","(kStarMISC <- kList[which.min(miscKNN_Out)]) "
+"1","[1]"
+"1"," 17"
+"1","
+"
+"0","abline(v=kStarMISC, col=4, lwd=2) #k=17"

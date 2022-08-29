@@ -1,0 +1,21 @@
+"0","p5 <- ggplot(df, aes(x=chlorides)) + ggtitle(""Chlorides"") + "
+"0","  xlab(""Chlorides"") + geom_histogram(fill=""salmon"")"
+"0","p6 <- ggplot(df, aes(x=free.sulfur.dioxide )) + ggtitle(""Free sulfur dioxide"")+ "
+"0","  xlab(""Free sulfur dioxide"") + geom_histogram(fill=""salmon"") "
+"0","p7 <- ggplot(df, aes(x=total.sulfur.dioxide)) + ggtitle(""Total sulfure dioxide"") + xlab(""Total sulfure dioxide"") + "
+"0","  geom_histogram(fill=""salmon"") "
+"0","p8 <- ggplot(df, aes(x=pH)) + ggtitle(""pH"") + "
+"0","  xlab(""pH"") + geom_histogram(fill=""salmon"")"
+"0","grid.arrange(p5, p6, p7, p8, ncol=2)"
+"2","`stat_bin()` using `bins = 30`. Pick better value
+with `binwidth`.
+"
+"2","`stat_bin()` using `bins = 30`. Pick better value
+with `binwidth`.
+"
+"2","`stat_bin()` using `bins = 30`. Pick better value
+with `binwidth`.
+"
+"2","`stat_bin()` using `bins = 30`. Pick better value
+with `binwidth`.
+"
